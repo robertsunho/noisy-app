@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'screens/mixer_screen.dart';
+import 'services/audio_engine.dart';
 
 void main() {
   runApp(const NoisyApp());
@@ -27,7 +29,7 @@ class NoisyApp extends StatelessWidget {
         scaffoldBackgroundColor: const Color(0xFF1C1C1C),
         navigationBarTheme: NavigationBarThemeData(
           backgroundColor: const Color(0xFF252525),
-          indicatorColor: const Color(0xFFD4A017).withOpacity(0.2),
+          indicatorColor: const Color(0xFFD4A017).withValues(alpha: 0.2),
           iconTheme: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.selected)) {
               return const IconThemeData(color: Color(0xFFD4A017));
@@ -75,14 +77,28 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
-
-  static const List<Widget> _screens = [
-    _PlaceholderScreen(label: 'Home Screen', icon: Icons.home_rounded),
-    _PlaceholderScreen(label: 'Mixer Screen', icon: Icons.tune_rounded),
-    _PlaceholderScreen(label: 'Library Screen', icon: Icons.library_music_rounded),
-  ];
+  late final AudioEngine _audioEngine;
+  late final List<Widget> _screens;
 
   static const List<String> _titles = ['Noisy', 'Mixer', 'Library'];
+
+  @override
+  void initState() {
+    super.initState();
+    _audioEngine = AudioEngine();
+    _screens = [
+      const _PlaceholderScreen(label: 'Home Screen', icon: Icons.home_rounded),
+      MixerScreen(engine: _audioEngine),
+      const _PlaceholderScreen(
+          label: 'Library Screen', icon: Icons.library_music_rounded),
+    ];
+  }
+
+  @override
+  void dispose() {
+    _audioEngine.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

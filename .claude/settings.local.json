@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmd.exe /c \"dir /s /b C:\\\\Users\\\\rober\\\\noisy_app\\\\assets\")",
+      "Bash(cmd.exe /c \"dir C:\\\\Users\\\\rober\\\\noisy_app\")",
+      "Bash(cmd.exe /c \"dir /b C:\\\\Users\\\\rober\\\\noisy_app\")",
+      "Bash(dir:*)",
+      "Bash(echo:*)",
+      "Bash(flutter pub add:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(flutter run:*)"
+    ]
+  }
+}
