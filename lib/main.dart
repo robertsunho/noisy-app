@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'screens/journey_screen.dart';
+import 'screens/library_screen.dart';
 import 'screens/mixer_screen.dart';
 import 'services/audio_engine.dart';
 import 'services/journey_engine.dart';
@@ -94,8 +95,7 @@ class _MainShellState extends State<MainShell> {
     _screens = [
       HomeScreen(engine: _audioEngine),
       MixerScreen(engine: _audioEngine),
-      const _PlaceholderScreen(
-          label: 'Library Screen', icon: Icons.library_music_rounded),
+      LibraryScreen(engine: _audioEngine),
       JourneyScreen(
           audioEngine: _audioEngine, journeyEngine: _journeyEngine),
     ];
@@ -147,30 +147,3 @@ class _MainShellState extends State<MainShell> {
   }
 }
 
-class _PlaceholderScreen extends StatelessWidget {
-  final String label;
-  final IconData icon;
-
-  const _PlaceholderScreen({required this.label, required this.icon});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 48, color: theme.colorScheme.outline),
-          const SizedBox(height: 16),
-          Text(
-            label,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: theme.colorScheme.outline,
-              letterSpacing: 0.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
