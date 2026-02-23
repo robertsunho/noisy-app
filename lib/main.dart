@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'screens/home_screen.dart';
+import 'screens/journey_screen.dart';
 import 'screens/mixer_screen.dart';
 import 'services/audio_engine.dart';
+import 'services/journey_engine.dart';
 
 void main() {
   runApp(const NoisyApp());
@@ -78,25 +81,30 @@ class MainShell extends StatefulWidget {
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
   late final AudioEngine _audioEngine;
+  late final JourneyEngine _journeyEngine;
   late final List<Widget> _screens;
 
-  static const List<String> _titles = ['Noisy', 'Mixer', 'Library'];
+  static const List<String> _titles = ['Noisy', 'Mixer', 'Library', 'Journey'];
 
   @override
   void initState() {
     super.initState();
     _audioEngine = AudioEngine();
+    _journeyEngine = JourneyEngine();
     _screens = [
-      const _PlaceholderScreen(label: 'Home Screen', icon: Icons.home_rounded),
+      HomeScreen(engine: _audioEngine),
       MixerScreen(engine: _audioEngine),
       const _PlaceholderScreen(
           label: 'Library Screen', icon: Icons.library_music_rounded),
+      JourneyScreen(
+          audioEngine: _audioEngine, journeyEngine: _journeyEngine),
     ];
   }
 
   @override
   void dispose() {
     _audioEngine.dispose();
+    _journeyEngine.dispose();
     super.dispose();
   }
 
@@ -127,6 +135,11 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.library_music_outlined),
             selectedIcon: Icon(Icons.library_music_rounded),
             label: 'Library',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.schedule_outlined),
+            selectedIcon: Icon(Icons.schedule_rounded),
+            label: 'Journey',
           ),
         ],
       ),

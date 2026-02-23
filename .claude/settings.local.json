@@ -8,7 +8,12 @@
       "Bash(echo:*)",
       "Bash(flutter pub add:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(flutter run:*)"
+      "Bash(flutter run:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git filter-branch:*)",
+      "Bash(git reset:*)"
     ]
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
@@ -44,7 +45,10 @@ class AudioEngine extends ChangeNotifier {
     ));
     notifyListeners();
 
-    await player.play();
+    // Do NOT await play() — for LoopMode.one the returned Future only
+    // resolves when stop() is called, which would permanently block
+    // any caller that awaits addLayer (e.g. loading sequential preset layers).
+    unawaited(player.play());
   }
 
   Future<void> removeLayer(String assetPath) async {
