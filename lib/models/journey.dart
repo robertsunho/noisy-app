@@ -18,16 +18,16 @@ abstract class SoundSource {
 class SampleSource extends SoundSource {
   final String assetPath;
 
-  const SampleSource({required this.assetPath, required double volume})
-      : super(volume: volume, type: SoundSourceType.sample);
+  const SampleSource({required this.assetPath, required super.volume})
+      : super(type: SoundSourceType.sample);
 }
 
 /// A pure sine-wave tone (placeholder — engine skips this type for now).
 class ToneSource extends SoundSource {
   final double frequency;
 
-  const ToneSource({required this.frequency, required double volume})
-      : super(volume: volume, type: SoundSourceType.tone);
+  const ToneSource({required this.frequency, required super.volume})
+      : super(type: SoundSourceType.tone);
 }
 
 /// A binaural beat (placeholder — engine skips this type for now).
@@ -38,8 +38,8 @@ class BinauralSource extends SoundSource {
   const BinauralSource({
     required this.centerFrequency,
     required this.beatFrequency,
-    required double volume,
-  }) : super(volume: volume, type: SoundSourceType.binaural);
+    required super.volume,
+  }) : super(type: SoundSourceType.binaural);
 }
 
 // ─────────────────────────────────────────────

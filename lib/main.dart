@@ -93,7 +93,7 @@ class _MainShellState extends State<MainShell> {
     _audioEngine = AudioEngine();
     _journeyEngine = JourneyEngine();
     _screens = [
-      HomeScreen(engine: _audioEngine),
+      HomeScreen(audioEngine: _audioEngine, journeyEngine: _journeyEngine),
       MixerScreen(engine: _audioEngine),
       LibraryScreen(engine: _audioEngine),
       JourneyScreen(
