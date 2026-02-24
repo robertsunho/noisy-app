@@ -8,6 +8,10 @@ enum JourneyState { stopped, playing, frozen }
 class JourneyEngine extends ChangeNotifier {
   static const _tickInterval = Duration(milliseconds: 200);
 
+  /// Volume ramp applied to all layers for the first 2 s after start,
+  /// so the initial mix swells in rather than snapping to full volume.
+  static const _startupRamp = Duration(seconds: 2);
+
   Journey? _journey;
   AudioEngine? _engine;
   JourneyState _state = JourneyState.stopped;
@@ -107,7 +111,8 @@ class JourneyEngine extends ChangeNotifier {
         await stop();
       } else {
         await _applyInterpolation();
-        notifyListeners();
+        _engine?.notifyUpdate(); // keep mixer sliders in sync
+        notifyListeners();       // update journey progress UI
       }
     } finally {
       _ticking = false;
@@ -116,8 +121,8 @@ class JourneyEngine extends ChangeNotifier {
 
   // ── Waypoint loading ─────────────────────────
 
-  /// Loads all SampleSources from [waypoint] into the engine at their
-  /// specified volumes. Used for the first waypoint only (instant load).
+  /// Adds all SampleSources from [waypoint] into the engine at volume 0.
+  /// Actual volumes are ramped up by [_applyInterpolation] via [_startupRamp].
   Future<void> _loadWaypoint(JourneyWaypoint waypoint) async {
     if (_engine == null) return;
     for (final src in waypoint.layers) {
@@ -126,7 +131,7 @@ class JourneyEngine extends ChangeNotifier {
       if (!_engine!.hasLayer(src.assetPath)) {
         await _engine!.addLayer(src.assetPath, _nameFromPath(src.assetPath));
       }
-      _engine!.setVolume(src.assetPath, src.volume);
+      // Volume intentionally left at 0; _applyInterpolation handles the ramp.
     }
   }
 
@@ -197,12 +202,20 @@ class JourneyEngine extends ChangeNotifier {
     }
 
     // ── Apply to audio engine ────────────────────
+    // Startup ramp: scale all volumes 0→1 over the first _startupRamp so the
+    // initial mix swells in. The ramp only affects playback level, not the
+    // add/remove threshold, so layers are preloaded from the first tick.
+    final rampFactor = _stopwatch.elapsed < _startupRamp
+        ? (_stopwatch.elapsed.inMilliseconds / _startupRamp.inMilliseconds)
+            .clamp(0.0, 1.0)
+        : 1.0;
+
     for (final entry in targets.entries) {
       if (_engine == null) return; // guard: stop() may have been called
       final path = entry.key;
-      final vol = entry.value;
+      final rawVol = entry.value;
 
-      if (vol < 0.005) {
+      if (rawVol < 0.005) {
         // Volume effectively zero — remove layer if present.
         if (_engine!.hasLayer(path)) {
           await _engine!.removeLayer(path);
@@ -211,7 +224,7 @@ class JourneyEngine extends ChangeNotifier {
         if (!_engine!.hasLayer(path)) {
           await _engine!.addLayer(path, _nameFromPath(path));
         }
-        _engine!.setVolume(path, vol.clamp(0.0, 1.0));
+        _engine!.setVolume(path, (rawVol * rampFactor).clamp(0.0, 1.0));
       }
     }
   }
