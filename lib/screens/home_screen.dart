@@ -166,14 +166,12 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _playPreset(Preset preset) async {
     if (_loadingPreset != null) return;
 
-    // Tapping the active preset stops playback.
+    // Tapping the active preset fades it out and stops.
     if (_activePreset == preset.name) {
       setState(() => _loadingPreset = preset.name);
       try {
         final paths = widget.engine.layers.map((l) => l.assetPath).toList();
-        for (final path in paths) {
-          await widget.engine.removeLayer(path);
-        }
+        await Future.wait(paths.map(widget.engine.removeLayer));
       } finally {
         if (mounted) setState(() => _loadingPreset = null);
       }
@@ -182,21 +180,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
     setState(() => _loadingPreset = preset.name);
     try {
-      // Clear existing layers sequentially before adding new ones.
+      // Fade out and remove all existing layers in parallel (~1 s).
       final paths = widget.engine.layers.map((l) => l.assetPath).toList();
-      for (final path in paths) {
-        await widget.engine.removeLayer(path);
-      }
+      await Future.wait(paths.map(widget.engine.removeLayer));
 
-      // Add preset layers one at a time; each addLayer must complete before
-      // the next begins so the engine never receives concurrent asset loads.
+      // Load all new layers simultaneously — each starts silent.
+      await Future.wait(
+        preset.layers.map((l) => widget.engine.addLayer(l.assetPath, l.name)),
+      );
+
+      // Swell all layers up to their target volumes together over 2 s,
+      // overriding the default 1.5 s fade-in so the whole soundscape
+      // rises as one unified experience.
       for (final layer in preset.layers) {
-        await widget.engine.addLayer(layer.assetPath, layer.name);
-        widget.engine.setVolume(layer.assetPath, layer.volume);
+        widget.engine.fadeToVolume(
+          layer.assetPath,
+          layer.volume,
+          const Duration(seconds: 2),
+        );
       }
     } finally {
-      // Always clear the spinner, even if an error aborted loading.
-      // _activePreset will update automatically via _onEngineChanged.
       if (mounted) setState(() => _loadingPreset = null);
     }
   }
@@ -206,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
       itemCount: _kPresets.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 12),
+      separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final preset = _kPresets[index];
         return _PresetCard(

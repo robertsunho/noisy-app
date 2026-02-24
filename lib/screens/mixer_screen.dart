@@ -227,11 +227,22 @@ class _LayerCard extends StatefulWidget {
 
 class _LayerCardState extends State<_LayerCard> {
   late double _volume;
+  bool _isDragging = false;
 
   @override
   void initState() {
     super.initState();
     _volume = widget.layer.volume;
+  }
+
+  /// Sync the slider position while a fade is running, but only when the
+  /// user is not actively dragging (to prevent the thumb from snapping).
+  @override
+  void didUpdateWidget(_LayerCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!_isDragging) {
+      _volume = widget.layer.volume;
+    }
   }
 
   @override
@@ -286,6 +297,8 @@ class _LayerCardState extends State<_LayerCard> {
                       value: _volume,
                       min: 0.0,
                       max: 1.0,
+                      onChangeStart: (_) => setState(() => _isDragging = true),
+                      onChangeEnd: (_) => setState(() => _isDragging = false),
                       onChanged: (v) {
                         setState(() => _volume = v);
                         widget.engine.setVolume(widget.layer.assetPath, v);

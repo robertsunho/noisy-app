@@ -1,4 +1,4 @@
-import 'dart:async' show StreamSubscription, unawaited;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import '../models/sound_meta.dart';
@@ -328,6 +328,8 @@ class _SoundsScreen extends StatefulWidget {
 
 class _SoundsScreenState extends State<_SoundsScreen> {
   AudioPlayer? _previewPlayer;
+  double _previewVolume = 0.0;
+  Timer? _previewFadeTimer;
   String? _previewingPath;
   bool _previewLoading = false;
   StreamSubscription<ProcessingState>? _previewSub;
@@ -349,29 +351,74 @@ class _SoundsScreenState extends State<_SoundsScreen> {
     if (mounted) setState(() {});
   }
 
+  // Immediate stop — no fade. Used in dispose, errors, and when switching
+  // to a new preview (the incoming sound takes over immediately).
   void _cleanupPreview() {
+    _previewFadeTimer?.cancel();
+    _previewFadeTimer = null;
     _previewSub?.cancel();
     _previewSub = null;
     _previewPlayer?.stop();
     _previewPlayer?.dispose();
     _previewPlayer = null;
+    _previewVolume = 0.0;
+  }
+
+  // Fade the current preview to silence over 0.5 s, then stop and dispose.
+  Future<void> _stopPreviewWithFade() async {
+    final player = _previewPlayer;
+    if (player == null) return;
+
+    // Take ownership so nothing else touches this player during the fade.
+    _previewFadeTimer?.cancel();
+    _previewFadeTimer = null;
+    _previewSub?.cancel();
+    _previewSub = null;
+    _previewPlayer = null;
+
+    final startVol = _previewVolume;
+    _previewVolume = 0.0;
+
+    if (startVol > 0.01) {
+      const steps = 10; // 500 ms / 50 ms ticks
+      int tick = 0;
+      final completer = Completer<void>();
+
+      Timer.periodic(const Duration(milliseconds: 50), (timer) {
+        tick++;
+        if (tick >= steps) {
+          timer.cancel();
+          player.setVolume(0);
+          if (!completer.isCompleted) completer.complete();
+        } else {
+          player.setVolume(startVol * (1.0 - tick / steps));
+        }
+      });
+
+      await completer.future;
+    }
+
+    await player.stop();
+    await player.dispose();
   }
 
   Future<void> _togglePreview(SoundMeta meta) async {
-    // Tapping the active preview stops it.
+    // Tapping the active preview: fade out to silence then stop.
     if (_previewingPath == meta.assetPath) {
-      _cleanupPreview();
-      if (mounted) setState(() { _previewingPath = null; _previewLoading = false; });
+      if (mounted) setState(() => _previewingPath = null);
+      await _stopPreviewWithFade();
       return;
     }
 
-    // Stop any existing preview before starting a new one.
+    // Switching to a different sound: cut the previous one immediately
+    // (the new audio is about to start, so a crossfade isn't needed).
     _cleanupPreview();
     if (!mounted) return;
 
     setState(() {
       _previewLoading = true;
       _previewingPath = meta.assetPath;
+      _previewVolume = 0.0;
     });
 
     final player = AudioPlayer();
@@ -379,25 +426,51 @@ class _SoundsScreenState extends State<_SoundsScreen> {
 
     try {
       await player.setAsset(meta.assetPath);
+      await player.setVolume(0.0);
 
       // Listen for natural completion to auto-clear preview state.
       _previewSub = player.processingStateStream.listen((state) {
-        if (state == ProcessingState.completed && mounted) {
-          setState(() {
-            _previewingPath = null;
-            _previewLoading = false;
-          });
+        if (state == ProcessingState.completed) {
+          _previewFadeTimer?.cancel();
+          _previewFadeTimer = null;
+          if (_previewPlayer == player) {
+            _previewPlayer?.dispose();
+            _previewPlayer = null;
+            _previewVolume = 0.0;
+          }
+          if (mounted) setState(() { _previewingPath = null; _previewLoading = false; });
         }
       });
 
-      // Fire-and-forget: non-looping audio, Future completes when done.
       unawaited(player.play());
-
       if (mounted) setState(() => _previewLoading = false);
+
+      // Fade in from silence to preview volume over 1.5 s.
+      const targetVol = 0.7;
+      const steps = 30; // 1500 ms / 50 ms ticks
+      int tick = 0;
+
+      _previewFadeTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+        if (_previewPlayer != player) {
+          // This player was replaced or cleaned up — stop the timer.
+          timer.cancel();
+          return;
+        }
+        tick++;
+        if (tick >= steps) {
+          timer.cancel();
+          _previewFadeTimer = null;
+          _previewVolume = targetVol;
+          player.setVolume(targetVol);
+        } else {
+          _previewVolume = targetVol * tick / steps;
+          player.setVolume(_previewVolume);
+        }
+      });
     } catch (_) {
       _cleanupPreview();
       if (mounted) {
-        setState(() { _previewingPath = null; _previewLoading = false; });
+        setState(() { _previewingPath = null; _previewLoading = false; _previewVolume = 0.0; });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not preview ${meta.name}')),
         );
@@ -408,7 +481,14 @@ class _SoundsScreenState extends State<_SoundsScreen> {
   Future<void> _addToMix(SoundMeta meta) async {
     try {
       await widget.engine.addLayer(meta.assetPath, meta.name);
-      widget.engine.setVolume(meta.assetPath, meta.defaultVolume);
+      // Redirect the engine's built-in fade to the sound's intended default
+      // volume rather than the generic 0.7. Starting from 0, this produces
+      // a clean fade from silence to the correct target level over 1.5 s.
+      widget.engine.fadeToVolume(
+        meta.assetPath,
+        meta.defaultVolume,
+        const Duration(milliseconds: 1500),
+      );
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

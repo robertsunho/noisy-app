@@ -86,11 +86,10 @@ class JourneyEngine extends ChangeNotifier {
     _journey = null;
 
     if (_engine != null) {
-      final paths = _engine!.layers.map((l) => l.assetPath).toList();
-      for (final path in paths) {
-        await _engine!.removeLayer(path);
-      }
+      final engine = _engine!;
       _engine = null;
+      final paths = engine.layers.map((l) => l.assetPath).toList();
+      await Future.wait(paths.map(engine.removeLayer));
     }
 
     notifyListeners();
