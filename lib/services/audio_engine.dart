@@ -6,14 +6,15 @@ class AudioLayer {
   final String assetPath;
   final String name;
   AudioPlayer _player;     // currently active player
-  AudioPlayer? _xPlayer;   // secondary player during crossfade loop
+  AudioPlayer? _xPlayer;   // secondary player during crossfade
   double volume;
   double _xfadeT = 0.0;    // 0 = all _player, 1 = all _xPlayer
   Duration? fileDuration;
 
   Timer? _fadeTimer;        // engine volume fades
-  Timer? _scheduleTimer;    // when to start next loop crossfade
   Timer? _xfadeTimer;       // crossfade execution ticks
+  StreamSubscription<Duration>? _positionSub;   // crossfade trigger
+  StreamSubscription<Duration?>? _durationSub;  // waits for duration on web
 
   AudioLayer({
     required this.assetPath,
@@ -26,7 +27,7 @@ class AudioLayer {
 class AudioEngine extends ChangeNotifier {
   static const int maxLayers = 5;
 
-  // Crossfade duration and lead-time before the loop point.
+  // How long the crossfade blend lasts, and how early to start it.
   static const _xfadeDuration = Duration(seconds: 3);
   static const _xfadeBuffer = Duration(milliseconds: 500);
 
@@ -61,14 +62,12 @@ class AudioEngine extends ChangeNotifier {
     // resolves when playback ends, which would block callers.
     unawaited(player.play());
 
-    // Fade in to default volume and schedule the seamless loop crossfade.
     _startFade(layer, 0.7, const Duration(milliseconds: 1500));
-    _scheduleLoop(layer);
+    _setupLayerLooping(layer);
   }
 
   /// Fades the layer to 0 over ~1 s, then removes and disposes it.
-  /// If the layer is already near-silent (volume ≤ 0.02) the fade is skipped
-  /// so the journey engine's near-zero removals complete immediately.
+  /// Near-silent layers (≤ 0.02) skip the fade for immediate removal.
   Future<void> removeLayer(String assetPath) async {
     final index = _layers.indexWhere((l) => l.assetPath == assetPath);
     if (index == -1) return;
@@ -76,10 +75,12 @@ class AudioEngine extends ChangeNotifier {
     final layer = _layers[index];
     layer._fadeTimer?.cancel();
     layer._fadeTimer = null;
-    layer._scheduleTimer?.cancel();
-    layer._scheduleTimer = null;
     layer._xfadeTimer?.cancel();
     layer._xfadeTimer = null;
+    layer._positionSub?.cancel();
+    layer._positionSub = null;
+    layer._durationSub?.cancel();
+    layer._durationSub = null;
 
     if (layer.volume > 0.02) {
       final completer = Completer<void>();
@@ -132,7 +133,7 @@ class AudioEngine extends ChangeNotifier {
   // ── Private ──────────────────────────────────────────────────────────────
 
   /// Applies [layer.volume] to the correct player(s), accounting for any
-  /// crossfade in progress.
+  /// crossfade blend in progress.
   void _applyLayerVolumes(AudioLayer layer) {
     final v = layer.volume.clamp(0.0, 1.0);
     if (layer._xPlayer == null) {
@@ -190,29 +191,66 @@ class AudioEngine extends ChangeNotifier {
 
   // ── Seamless crossfade loop ───────────────────────────────────────────────
 
-  /// Schedules a crossfade to start [_xfadeDuration] + [_xfadeBuffer] before
-  /// the current player reaches the end of [layer.fileDuration].
-  void _scheduleLoop(AudioLayer layer) {
-    layer._scheduleTimer?.cancel();
-    layer._scheduleTimer = null;
+  /// Sets up seamless looping for [layer].
+  ///
+  /// Immediately applies [LoopMode.one] as a guaranteed fallback — this alone
+  /// prevents silence even if the crossfade never fires.  Then:
+  /// - If [layer.fileDuration] is already known, starts position monitoring.
+  /// - Otherwise, listens on [durationStream] (needed on web/Chrome where
+  ///   [AudioPlayer.duration] is null until the file is partially buffered),
+  ///   and starts position monitoring once the duration arrives.
+  void _setupLayerLooping(AudioLayer layer) {
+    // Fallback: LoopMode.one ensures the track loops even without crossfade.
+    layer._player.setLoopMode(LoopMode.one);
+
+    if (layer.fileDuration != null) {
+      _startPositionMonitor(layer);
+    } else {
+      // Wait for duration to become available (common on web).
+      layer._durationSub?.cancel();
+      layer._durationSub = layer._player.durationStream.listen((d) {
+        if (d == null) return;
+        layer.fileDuration = d;
+        layer._durationSub?.cancel();
+        layer._durationSub = null;
+        _startPositionMonitor(layer);
+      });
+    }
+  }
+
+  /// Subscribes to [layer._player]'s position stream and triggers a crossfade
+  /// when the playhead is within ([_xfadeDuration] + [_xfadeBuffer]) of the
+  /// end. Works regardless of timer precision and compensates for any drift.
+  void _startPositionMonitor(AudioLayer layer) {
+    layer._positionSub?.cancel();
+    layer._positionSub = null;
 
     final duration = layer.fileDuration;
     if (duration == null) return;
 
-    final delay = duration - _xfadeDuration - _xfadeBuffer;
-    if (delay <= Duration.zero) return; // file too short for crossfade
+    final threshold = _xfadeDuration + _xfadeBuffer;
 
-    layer._scheduleTimer = Timer(delay, () => _startCrossfade(layer));
+    layer._positionSub = layer._player.positionStream.listen((position) {
+      if (layer._xfadeTimer != null) return; // crossfade already running
+      if (position < duration - threshold) return; // too early
+
+      // Within the crossfade window — trigger the transition.
+      layer._positionSub?.cancel();
+      layer._positionSub = null;
+      _startCrossfade(layer);
+    });
   }
 
-  /// Starts a crossfade: launches a fresh secondary player and blends
-  /// from [layer._player] → [layer._xPlayer] over [_xfadeDuration].
+  /// Launches a fresh secondary player and blends from [_player] to [_xPlayer]
+  /// over [_xfadeDuration]. Both players carry [LoopMode.one] so either can
+  /// survive if the crossfade fires slightly late.
   Future<void> _startCrossfade(AudioLayer layer) async {
     if (!_layers.contains(layer)) return;
-    if (layer._xfadeTimer != null) return; // already crossfading
+    if (layer._xfadeTimer != null) return;
 
     final next = AudioPlayer();
     await next.setAsset(layer.assetPath);
+    await next.setLoopMode(LoopMode.one);
     next.setVolume(0.0);
     unawaited(next.play());
 
@@ -244,7 +282,7 @@ class AudioEngine extends ChangeNotifier {
   }
 
   /// Swaps in the secondary player as the new primary, disposes the old one,
-  /// and schedules the next crossfade.
+  /// and begins position monitoring for the next loop crossfade.
   Future<void> _completeCrossfade(AudioLayer layer) async {
     if (!_layers.contains(layer)) {
       await layer._xPlayer?.stop();
@@ -259,21 +297,24 @@ class AudioEngine extends ChangeNotifier {
     layer._player = newPlayer;
     layer._xPlayer = null;
     layer._xfadeT = 0.0;
-    layer.fileDuration = newPlayer.duration;
+    // Prefer the new player's duration; keep old value if still unavailable.
+    layer.fileDuration = newPlayer.duration ?? layer.fileDuration;
     _applyLayerVolumes(layer);
 
     await oldPlayer.stop();
     await oldPlayer.dispose();
 
-    _scheduleLoop(layer);
+    // New player already has LoopMode.one; start watching its position.
+    _startPositionMonitor(layer);
   }
 
   @override
   void dispose() {
     for (final layer in _layers) {
       layer._fadeTimer?.cancel();
-      layer._scheduleTimer?.cancel();
       layer._xfadeTimer?.cancel();
+      layer._positionSub?.cancel();
+      layer._durationSub?.cancel();
       layer._player.stop();
       layer._player.dispose();
       layer._xPlayer?.stop();
