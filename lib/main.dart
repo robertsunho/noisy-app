@@ -5,6 +5,7 @@ import 'screens/library_screen.dart';
 import 'screens/mixer_screen.dart';
 import 'services/audio_engine.dart';
 import 'services/journey_engine.dart';
+import 'services/storage_service.dart';
 
 void main() {
   runApp(const NoisyApp());
@@ -83,7 +84,12 @@ class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
   late final AudioEngine _audioEngine;
   late final JourneyEngine _journeyEngine;
+  late final StorageService _storageService;
   late final List<Widget> _screens;
+
+  // GlobalKeys allow MainShell to call public methods on screen states.
+  final _homeKey = GlobalKey<HomeScreenState>();
+  final _mixerKey = GlobalKey<MixerScreenState>();
 
   static const List<String> _titles = ['Noisy', 'Mixer', 'Library', 'Journey'];
 
@@ -91,18 +97,38 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     _audioEngine = AudioEngine();
+    _audioEngine.addListener(_onEngineChanged);
     _journeyEngine = JourneyEngine();
+    _storageService = StorageService();
+
     _screens = [
-      HomeScreen(audioEngine: _audioEngine, journeyEngine: _journeyEngine),
-      MixerScreen(engine: _audioEngine),
+      HomeScreen(
+        key: _homeKey,
+        audioEngine: _audioEngine,
+        journeyEngine: _journeyEngine,
+        storage: _storageService,
+      ),
+      MixerScreen(
+        key: _mixerKey,
+        engine: _audioEngine,
+        storage: _storageService,
+        // After a mix is saved from the Mixer, refresh the Home list.
+        onMixSaved: () => _homeKey.currentState?.loadMixes(),
+      ),
       LibraryScreen(engine: _audioEngine),
       JourneyScreen(
           audioEngine: _audioEngine, journeyEngine: _journeyEngine),
     ];
   }
 
+  void _onEngineChanged() {
+    // Rebuild so the app bar save button reflects current layer count.
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    _audioEngine.removeListener(_onEngineChanged);
     _audioEngine.dispose();
     _journeyEngine.dispose();
     super.dispose();
@@ -110,14 +136,41 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasMixLayers = _audioEngine.layers.isNotEmpty;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_titles[_selectedIndex]),
+        actions: _selectedIndex == 1
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.bookmark_add_outlined),
+                  tooltip: 'Save mix',
+                  color: hasMixLayers
+                      ? theme.colorScheme.primary
+                      : theme.colorScheme.outline,
+                  onPressed: hasMixLayers
+                      ? () => _mixerKey.currentState?.openSaveDialog()
+                      : null,
+                ),
+              ]
+            : null,
       ),
-      body: _screens[_selectedIndex],
+      // IndexedStack keeps all screens alive so their state is preserved
+      // across tab switches (e.g. HomeScreen's saved mixes list).
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
+          // Refresh the saved mixes list whenever the user returns to Home
+          // in case they saved a new mix from the Mixer tab.
+          if (index == 0 && _selectedIndex != 0) {
+            _homeKey.currentState?.loadMixes();
+          }
           setState(() => _selectedIndex = index);
         },
         destinations: const [
@@ -146,4 +199,3 @@ class _MainShellState extends State<MainShell> {
     );
   }
 }
-

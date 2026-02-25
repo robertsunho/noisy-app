@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import '../models/saved_mix.dart';
 import '../services/audio_engine.dart';
+import '../services/storage_service.dart';
+
+// ── Sound catalog ─────────────────────────────────────────────────────────────
 
 class SoundItem {
   final String name;
@@ -46,17 +50,27 @@ const List<SoundItem> _kSoundCatalog = [
 ];
 
 const _kCategories = ['Nature', 'Noise', 'Binaural', 'Frequencies'];
+const _kMixCategories = ['Sleep', 'Focus', 'Meditate', 'Relax', 'Energize'];
+
+// ── Widget ────────────────────────────────────────────────────────────────────
 
 class MixerScreen extends StatefulWidget {
   final AudioEngine engine;
+  final StorageService storage;
+  final VoidCallback? onMixSaved;
 
-  const MixerScreen({super.key, required this.engine});
+  const MixerScreen({
+    super.key,
+    required this.engine,
+    required this.storage,
+    this.onMixSaved,
+  });
 
   @override
-  State<MixerScreen> createState() => _MixerScreenState();
+  State<MixerScreen> createState() => MixerScreenState();
 }
 
-class _MixerScreenState extends State<MixerScreen> {
+class MixerScreenState extends State<MixerScreen> {
   final Set<String> _loading = {};
 
   AudioEngine get _engine => widget.engine;
@@ -64,8 +78,6 @@ class _MixerScreenState extends State<MixerScreen> {
   @override
   void initState() {
     super.initState();
-    // Listen to engine so layer adds/removes always rebuild the UI,
-    // regardless of whether the async chain above completed cleanly.
     _engine.addListener(_onEngineChanged);
   }
 
@@ -79,12 +91,17 @@ class _MixerScreenState extends State<MixerScreen> {
     super.dispose();
   }
 
+  // ── Public API (called by MainShell via GlobalKey) ────────────────────────
+
+  void openSaveDialog() => _showSaveDialog();
+
+  // ── Sound tap ─────────────────────────────────────────────────────────────
+
   Future<void> _onSoundTapped(SoundItem sound) async {
     if (_loading.contains(sound.assetPath)) return;
 
     if (_engine.hasLayer(sound.assetPath)) {
       await _engine.removeLayer(sound.assetPath);
-      // Engine notifies → _onEngineChanged → setState handled automatically.
       return;
     }
 
@@ -100,6 +117,144 @@ class _MixerScreenState extends State<MixerScreen> {
     }
   }
 
+  // ── Save dialog ───────────────────────────────────────────────────────────
+
+  void _showSaveDialog() {
+    final controller = TextEditingController();
+    String selectedCategory = '';
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final theme = Theme.of(ctx);
+          final gold = theme.colorScheme.primary;
+          final canSave = controller.text.trim().isNotEmpty &&
+              _engine.layers.isNotEmpty;
+
+          return AlertDialog(
+            backgroundColor: theme.colorScheme.surfaceContainerHighest,
+            title: Text(
+              'Save Mix',
+              style: TextStyle(color: theme.colorScheme.onSurface),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Name field
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  onChanged: (_) => setDialogState(() {}),
+                  decoration: InputDecoration(
+                    hintText: 'Mix name',
+                    hintStyle: TextStyle(
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.4),
+                    ),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide:
+                          BorderSide(color: theme.colorScheme.outline),
+                    ),
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: gold, width: 2),
+                    ),
+                  ),
+                  style: TextStyle(color: theme.colorScheme.onSurface),
+                ),
+                const SizedBox(height: 20),
+
+                // Category chips
+                Text(
+                  'CATEGORY (OPTIONAL)',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.outline,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _kMixCategories.map((cat) {
+                    final sel = selectedCategory == cat;
+                    return GestureDetector(
+                      onTap: () => setDialogState(
+                          () => selectedCategory = sel ? '' : cat),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: sel
+                              ? gold
+                              : gold.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          cat,
+                          style: TextStyle(
+                            color:
+                                sel ? const Color(0xFF1C1C1C) : gold,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(
+                  'Cancel',
+                  style:
+                      TextStyle(color: theme.colorScheme.outline),
+                ),
+              ),
+              FilledButton(
+                onPressed: canSave
+                    ? () async {
+                        final mix = SavedMix(
+                          id: SavedMix.generateId(),
+                          name: controller.text.trim(),
+                          category: selectedCategory,
+                          layers: _engine.layers
+                              .map((l) => MixLayer(
+                                    assetPath: l.assetPath,
+                                    name: l.name,
+                                    volume: l.volume,
+                                  ))
+                              .toList(),
+                          createdAt: DateTime.now(),
+                        );
+                        await widget.storage.save(mix);
+                        widget.onMixSaved?.call();
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      }
+                    : null,
+                style: FilledButton.styleFrom(
+                  backgroundColor: gold,
+                  foregroundColor: const Color(0xFF1C1C1C),
+                  disabledBackgroundColor:
+                      gold.withValues(alpha: 0.3),
+                  disabledForegroundColor:
+                      const Color(0xFF1C1C1C).withValues(alpha: 0.4),
+                ),
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      ),
+    ).then((_) => controller.dispose());
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -112,7 +267,7 @@ class _MixerScreenState extends State<MixerScreen> {
 
     return CustomScrollView(
       slivers: [
-        // ── Active Mix ─────────────────────────────────────────────
+        // ── Active Mix ───────────────────────────────────────────────────
         if (layers.isNotEmpty) ...[
           SliverToBoxAdapter(
             child: Padding(
@@ -129,10 +284,11 @@ class _MixerScreenState extends State<MixerScreen> {
                   ),
                   const SizedBox(width: 8),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 7, vertical: 2),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withValues(alpha: 0.15),
+                      color: theme.colorScheme.primary
+                          .withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Text(
@@ -165,7 +321,7 @@ class _MixerScreenState extends State<MixerScreen> {
           ),
         ],
 
-        // ── Sound Library ──────────────────────────────────────────
+        // ── Sound Library ────────────────────────────────────────────────
         for (final category in _kCategories)
           if (grouped[category]?.isNotEmpty == true) ...[
             SliverToBoxAdapter(
@@ -209,7 +365,7 @@ class _MixerScreenState extends State<MixerScreen> {
   }
 }
 
-// ── Layer card (StatefulWidget for local slider state) ─────────────────────
+// ── Layer card ────────────────────────────────────────────────────────────────
 
 class _LayerCard extends StatefulWidget {
   final AudioLayer layer;
@@ -235,8 +391,6 @@ class _LayerCardState extends State<_LayerCard> {
     _volume = widget.layer.volume;
   }
 
-  /// Sync the slider position while a fade is running, but only when the
-  /// user is not actively dragging (to prevent the thumb from snapping).
   @override
   void didUpdateWidget(_LayerCard oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -297,8 +451,10 @@ class _LayerCardState extends State<_LayerCard> {
                       value: _volume,
                       min: 0.0,
                       max: 1.0,
-                      onChangeStart: (_) => setState(() => _isDragging = true),
-                      onChangeEnd: (_) => setState(() => _isDragging = false),
+                      onChangeStart: (_) =>
+                          setState(() => _isDragging = true),
+                      onChangeEnd: (_) =>
+                          setState(() => _isDragging = false),
                       onChanged: (v) {
                         setState(() => _volume = v);
                         widget.engine.setVolume(widget.layer.assetPath, v);
@@ -312,8 +468,10 @@ class _LayerCardState extends State<_LayerCard> {
               icon: const Icon(Icons.close, size: 18),
               color: theme.colorScheme.outline,
               padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              onPressed: () => widget.engine.removeLayer(widget.layer.assetPath),
+              constraints:
+                  const BoxConstraints(minWidth: 36, minHeight: 36),
+              onPressed: () =>
+                  widget.engine.removeLayer(widget.layer.assetPath),
             ),
           ],
         ),
@@ -322,7 +480,7 @@ class _LayerCardState extends State<_LayerCard> {
   }
 }
 
-// ── Sound chip ─────────────────────────────────────────────────────────────
+// ── Sound chip ────────────────────────────────────────────────────────────────
 
 class _SoundChip extends StatelessWidget {
   final SoundItem sound;
@@ -363,7 +521,8 @@ class _SoundChip extends StatelessWidget {
       onTap: isDisabled || isLoading ? null : onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(20),
@@ -397,7 +556,8 @@ class _SoundChip extends StatelessWidget {
               sound.name,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: textColor,
-                fontWeight: isActive ? FontWeight.w600 : FontWeight.normal,
+                fontWeight:
+                    isActive ? FontWeight.w600 : FontWeight.normal,
               ),
             ),
           ],

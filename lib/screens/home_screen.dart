@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/journey.dart';
+import '../models/saved_mix.dart';
 import '../services/audio_engine.dart';
 import '../services/journey_engine.dart';
+import '../services/storage_service.dart';
 
 // ─── Duration quick-pick helpers ─────────────────────────────────────────────
 
@@ -254,29 +256,29 @@ const List<Journey> _kJourneys = [
 class HomeScreen extends StatefulWidget {
   final AudioEngine audioEngine;
   final JourneyEngine journeyEngine;
+  final StorageService storage;
 
   const HomeScreen({
     super.key,
     required this.audioEngine,
     required this.journeyEngine,
+    required this.storage,
   });
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() => HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  /// Which card is expanded to show the duration selector.
+class HomeScreenState extends State<HomeScreen> {
   String? _expandedId;
-
-  /// Per-journey selected duration in minutes. Defaults to each journey's
-  /// defaultDuration when not yet overridden by the user.
   final Map<String, double> _durationMinutes = {};
+  List<SavedMix> _savedMixes = [];
 
   @override
   void initState() {
     super.initState();
     widget.journeyEngine.addListener(_onChanged);
+    loadMixes();
   }
 
   @override
@@ -289,48 +291,165 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) setState(() {});
   }
 
+  // ── Public API (called by MainShell via GlobalKey) ────────────────────────
+
+  Future<void> loadMixes() async {
+    final mixes = await widget.storage.loadAll();
+    // Most-recent first.
+    mixes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    if (mounted) setState(() => _savedMixes = mixes);
+  }
+
+  // ── Journey helpers ───────────────────────────────────────────────────────
+
   double _durationFor(Journey j) =>
       _durationMinutes[j.id] ?? j.defaultDuration.inMinutes.toDouble();
 
   Future<void> _startJourney(Journey journey) async {
     final duration = Duration(minutes: _durationFor(journey).round());
-    // Collapse the card before starting so the UI doesn't flash.
     setState(() => _expandedId = null);
     await widget.journeyEngine.start(journey, widget.audioEngine, duration);
   }
+
+  // ── Saved mix actions ─────────────────────────────────────────────────────
+
+  Future<void> _playSavedMix(SavedMix mix) async {
+    // Stop any active journey (also removes its engine layers).
+    if (widget.journeyEngine.state != JourneyState.stopped) {
+      await widget.journeyEngine.stop();
+    }
+
+    // Fade out any remaining manually-added layers.
+    final existing =
+        widget.audioEngine.layers.map((l) => l.assetPath).toList();
+    await Future.wait(existing.map(widget.audioEngine.removeLayer));
+
+    // Load saved layers (each starts at volume 0).
+    for (final layer in mix.layers) {
+      if (widget.audioEngine.isFull) break;
+      await widget.audioEngine.addLayer(layer.assetPath, layer.name);
+    }
+
+    // 2-second swell to saved volumes (cancels addLayer's built-in fade).
+    for (final layer in mix.layers) {
+      widget.audioEngine.fadeToVolume(
+        layer.assetPath,
+        layer.volume,
+        const Duration(seconds: 2),
+      );
+    }
+  }
+
+  Future<void> _deleteMix(SavedMix mix) async {
+    setState(() => _savedMixes.removeWhere((m) => m.id == mix.id));
+    await widget.storage.delete(mix.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('"${mix.name}" deleted'),
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () async {
+            await widget.storage.save(mix);
+            await loadMixes();
+          },
+        ),
+      ),
+    );
+  }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final je = widget.journeyEngine;
     final activeId =
         je.state != JourneyState.stopped ? je.currentJourney?.id : null;
+    final theme = Theme.of(context);
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      itemCount: _kJourneys.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final journey = _kJourneys[index];
-        final isActive = activeId == journey.id;
-        final isExpanded = _expandedId == journey.id;
+    return CustomScrollView(
+      slivers: [
+        // ── Curated Journeys ──────────────────────────────────────────────
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                if (index.isOdd) return const SizedBox(height: 12);
+                final journey = _kJourneys[index ~/ 2];
+                final isActive = activeId == journey.id;
+                final isExpanded = _expandedId == journey.id;
+                return _JourneyCard(
+                  journey: journey,
+                  isActive: isActive,
+                  isExpanded: isExpanded,
+                  selectedMinutes: _durationFor(journey),
+                  onTap: isActive
+                      ? null
+                      : () => setState(() =>
+                          _expandedId = isExpanded ? null : journey.id),
+                  onDurationChanged: (v) =>
+                      setState(() => _durationMinutes[journey.id] = v),
+                  onStart: () => _startJourney(journey),
+                  onStop: () => widget.journeyEngine.stop(),
+                );
+              },
+              childCount: _kJourneys.length * 2 - 1,
+            ),
+          ),
+        ),
 
-        return _JourneyCard(
-          journey: journey,
-          isActive: isActive,
-          isExpanded: isExpanded,
-          selectedMinutes: _durationFor(journey),
-          // Active cards cannot be expanded — they show a stop button instead.
-          onTap: isActive
-              ? null
-              : () => setState(
-                    () => _expandedId = isExpanded ? null : journey.id,
-                  ),
-          onDurationChanged: (v) =>
-              setState(() => _durationMinutes[journey.id] = v),
-          onStart: () => _startJourney(journey),
-          onStop: () => widget.journeyEngine.stop(),
-        );
-      },
+        // ── My Mixes ──────────────────────────────────────────────────────
+        if (_savedMixes.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 32, 16, 12),
+              child: Text(
+                'MY MIXES',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.outline,
+                  letterSpacing: 1.8,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  if (index.isOdd) return const SizedBox(height: 10);
+                  final mix = _savedMixes[index ~/ 2];
+                  return Dismissible(
+                    key: ValueKey(mix.id),
+                    direction: DismissDirection.endToStart,
+                    onDismissed: (_) => _deleteMix(mix),
+                    background: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20),
+                      child: const Icon(Icons.delete_rounded,
+                          color: Colors.white),
+                    ),
+                    child: _MixCard(
+                      mix: mix,
+                      onPlay: () => _playSavedMix(mix),
+                    ),
+                  );
+                },
+                childCount: _savedMixes.length * 2 - 1,
+              ),
+            ),
+          ),
+        ],
+
+        const SliverToBoxAdapter(child: SizedBox(height: 32)),
+      ],
     );
   }
 }
@@ -368,7 +487,6 @@ class _JourneyCard extends StatelessWidget {
       ((journey.maxDuration.inMinutes - journey.minDuration.inMinutes) / 5)
           .round();
 
-  /// Layer names derived from the first waypoint, shown as chips.
   List<String> get _layerNames => journey.waypoints.first.layers
       .whereType<SampleSource>()
       .map((s) => _nameFromPath(s.assetPath))
@@ -441,7 +559,6 @@ class _JourneyCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Stop button when active; expand toggle otherwise.
                     if (isActive)
                       _ActionButton(
                         icon: Icons.stop_rounded,
@@ -507,7 +624,6 @@ class _JourneyCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
 
-                  // Label
                   Text(
                     'DURATION',
                     style: theme.textTheme.labelSmall?.copyWith(
@@ -519,7 +635,6 @@ class _JourneyCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
 
-                  // Quick-pick chips
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: _picks.map((min) {
@@ -553,7 +668,6 @@ class _JourneyCard extends StatelessWidget {
 
                   const SizedBox(height: 4),
 
-                  // Fine-tune slider
                   SliderTheme(
                     data: SliderThemeData(
                       activeTrackColor: gold,
@@ -584,7 +698,6 @@ class _JourneyCard extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
-                  // Start button
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton.icon(
@@ -608,6 +721,124 @@ class _JourneyCard extends StatelessWidget {
                     ),
                   ),
                 ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mix card
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _MixCard extends StatelessWidget {
+  final SavedMix mix;
+  final VoidCallback onPlay;
+
+  const _MixCard({required this.mix, required this.onPlay});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final gold = theme.colorScheme.primary;
+    final surface = theme.colorScheme.surfaceContainerHighest;
+    final onSurface = theme.colorScheme.onSurface;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPlay,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Name + category badge
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              mix.name,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: onSurface,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (mix.category.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: gold.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: gold.withValues(alpha: 0.25),
+                                  width: 0.5,
+                                ),
+                              ),
+                              child: Text(
+                                mix.category,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: gold,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Layer chips
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: mix.layers
+                            .map((l) => _LayerChip(
+                                  label: l.name,
+                                  isActive: false,
+                                  gold: gold,
+                                ))
+                            .toList(),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Play icon (visual only; InkWell on card handles the tap)
+                IgnorePointer(
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: gold.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.play_arrow_rounded,
+                      color: gold,
+                      size: 20,
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -696,7 +927,6 @@ class _LayerChip extends StatelessWidget {
 // Helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// "30 min", "1 hr", "1 hr 30 min"
 String _fmtLabel(Duration d) {
   if (d.inMinutes < 60) return '${d.inMinutes} min';
   final h = d.inHours;
@@ -704,7 +934,6 @@ String _fmtLabel(Duration d) {
   return m == 0 ? '$h hr' : '$h hr $m min';
 }
 
-/// "30m", "1h", "1h 30m" — compact form for chips
 String _fmtChipLabel(int minutes) {
   if (minutes < 60) return '${minutes}m';
   final h = minutes ~/ 60;
@@ -712,7 +941,6 @@ String _fmtChipLabel(int minutes) {
   return m == 0 ? '${h}h' : '${h}h ${m}m';
 }
 
-/// "assets/audio/noise/brown_noise.mp3" → "Brown Noise"
 String _nameFromPath(String assetPath) {
   final stem = assetPath.split('/').last.replaceAll('.mp3', '');
   return stem.split('_').map((w) {
