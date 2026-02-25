@@ -79,6 +79,24 @@ class JourneyEngine extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Releases journey control without touching the audio engine.
+  ///
+  /// The tick timer is cancelled and state is set to stopped, but every
+  /// currently-playing layer is left exactly as-is. Use this when the user
+  /// manually adjusts the mix (slider drag, layer remove) — audio keeps
+  /// playing at current volumes while the journey relinquishes ownership.
+  void abandon() {
+    _timer?.cancel();
+    _timer = null;
+    _stopwatch
+      ..stop()
+      ..reset();
+    _state = JourneyState.stopped;
+    _journey = null;
+    _engine = null;
+    notifyListeners();
+  }
+
   /// Halts the journey and clears all audio engine layers.
   Future<void> stop() async {
     _timer?.cancel();

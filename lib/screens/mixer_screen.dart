@@ -100,12 +100,12 @@ class MixerScreenState extends State<MixerScreen> {
 
   // ── Layer removal ─────────────────────────────────────────────────────────
 
-  /// Stops any active journey, then removes the layer.
-  /// Manually removing a layer invalidates the journey's waypoint data,
-  /// so the journey must be stopped first.
+  /// Abandons any active journey (without touching audio), then removes
+  /// the layer. Using abandon() instead of stop() means remaining layers
+  /// keep playing at their current volumes.
   Future<void> _removeLayer(String assetPath) async {
     if (widget.journeyEngine.state != JourneyState.stopped) {
-      await widget.journeyEngine.stop();
+      widget.journeyEngine.abandon();
     }
     await _engine.removeLayer(assetPath);
   }
@@ -323,6 +323,7 @@ class MixerScreenState extends State<MixerScreen> {
                 key: ValueKey(layers[i].assetPath),
                 layer: layers[i],
                 engine: _engine,
+                journeyEngine: widget.journeyEngine,
                 onRemove: () => _removeLayer(layers[i].assetPath),
               ),
               childCount: layers.length,
@@ -386,12 +387,14 @@ class MixerScreenState extends State<MixerScreen> {
 class _LayerCard extends StatefulWidget {
   final AudioLayer layer;
   final AudioEngine engine;
+  final JourneyEngine journeyEngine;
   final VoidCallback onRemove;
 
   const _LayerCard({
     super.key,
     required this.layer,
     required this.engine,
+    required this.journeyEngine,
     required this.onRemove,
   });
 
@@ -469,8 +472,15 @@ class _LayerCardState extends State<_LayerCard> {
                       value: _volume,
                       min: 0.0,
                       max: 1.0,
-                      onChangeStart: (_) =>
-                          setState(() => _isDragging = true),
+                      onChangeStart: (_) {
+                        // Abandon any active journey on the first drag so the
+                        // tick can't overwrite this slider's position.
+                        if (widget.journeyEngine.state !=
+                            JourneyState.stopped) {
+                          widget.journeyEngine.abandon();
+                        }
+                        setState(() => _isDragging = true);
+                      },
                       onChangeEnd: (_) =>
                           setState(() => _isDragging = false),
                       onChanged: (v) {
