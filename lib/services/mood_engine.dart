@@ -56,13 +56,24 @@ class MoodEngine {
     final recs = generateMix(energy, focus, warmth);
     final category = _inferCategory(energy, focus, warmth);
 
+    // If the mix contains a solfeggio tone, use its frequency as the binaural
+    // carrier so both oscillators share the same fundamental pitch.
+    final solfeggioFreq = recs
+        .where((r) => r.meta.category == 'frequencies')
+        .map((r) => _parseFrequency(r.meta.id))
+        .where((f) => f != null)
+        .cast<double>()
+        .firstOrNull;
+
     // Converts a recommendation to the appropriate SoundSource subtype.
     SoundSource toSource(SoundRecommendation r, double vol) {
       if (r.meta.category == 'binaural') {
         final p = _binauralParams[r.meta.id];
         if (p != null) {
           return BinauralSource(
-              centerFrequency: p.$1, beatFrequency: p.$2, volume: vol);
+              centerFrequency: solfeggioFreq ?? p.$1,
+              beatFrequency: p.$2,
+              volume: vol);
         }
       }
       if (r.meta.category == 'frequencies') {
