@@ -113,6 +113,7 @@ class _MainShellState extends State<MainShell> {
       MixerScreen(
         key: _mixerKey,
         engine: _audioEngine,
+        journeyEngine: _journeyEngine,
         storage: _storageService,
         // After a mix is saved from the Mixer, refresh the Library list.
         onMixSaved: () => _libraryKey.currentState?.loadMixes(),

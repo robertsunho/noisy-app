@@ -17,25 +17,18 @@ class SoundRecommendation {
 }
 
 class MoodEngine {
-  static const _volumes = [0.55, 0.45, 0.35, 0.25];
+  /// Maximum acceptable distance before a category is skipped.
+  static const _maxDist = 1.2;
 
   // ── Public API ────────────────────────────────────────────────────────────
 
-  /// Returns 3–4 recommended sounds closest to (energy, focus, warmth) with
-  /// a diversity constraint: the result must span at least 2 categories.
+  /// Returns 2–4 sounds for the given mood:
+  ///   • exactly 1 frequency (skipped if best distance > 1.2)   → vol 0.40
+  ///   • exactly 1 binaural  (skipped if best distance > 1.2)   → vol 0.45
+  ///   • 2 nature/noise textures (always selected)              → vol 0.50 / 0.30
   List<SoundRecommendation> generateMix(
       double energy, double focus, double warmth) {
-    final ranked = _rankSounds(energy, focus, warmth);
-    final selected = _selectWithDiversity(ranked, 4);
-
-    return [
-      for (var i = 0; i < selected.length; i++)
-        SoundRecommendation(
-          meta: selected[i].$1,
-          volume: _volumes[i],
-          distance: selected[i].$2,
-        )
-    ];
+    return _selectByCategory(energy, focus, warmth);
   }
 
   /// Creates a 3-waypoint [Journey] whose mix is tuned to the requested mood.
@@ -91,43 +84,58 @@ class MoodEngine {
 
   // ── Private helpers ───────────────────────────────────────────────────────
 
-  /// Rank all available sounds by Euclidean distance to the target mood.
-  List<(SoundMeta, double)> _rankSounds(
+  /// Build the balanced mix: 2 textures + up to 1 binaural + up to 1 frequency.
+  List<SoundRecommendation> _selectByCategory(
       double energy, double focus, double warmth) {
-    return kSoundCatalog
+    // Per-category sorted lists (closest first).
+    final all = kSoundCatalog
         .where((s) => s.isAvailable && kMoodProfiles.containsKey(s.id))
         .map((s) {
           final p = kMoodProfiles[s.id]!;
-          final d = _dist(energy, focus, warmth, p.energy, p.focus, p.warmth);
-          return (s, d);
+          return (s, _dist(energy, focus, warmth, p.energy, p.focus, p.warmth));
         })
         .toList()
       ..sort((a, b) => a.$2.compareTo(b.$2));
-  }
 
-  /// Select up to [max] sounds, ensuring at least 2 different categories.
-  List<(SoundMeta, double)> _selectWithDiversity(
-      List<(SoundMeta, double)> ranked, int max) {
-    final result = <(SoundMeta, double)>[];
-    final seenCategories = <String>{};
+    List<(SoundMeta, double)> ofCat(String cat) =>
+        all.where((e) => e.$1.category == cat).toList();
 
-    for (final entry in ranked) {
-      if (result.length >= max) break;
-      final newCategory = !seenCategories.contains(entry.$1.category);
-      // Always add the best match; for subsequent ones prefer new categories
-      // until we have diversity, then accept any.
-      if (result.isEmpty || newCategory || seenCategories.length >= 2) {
-        result.add(entry);
-        seenCategories.add(entry.$1.category);
-      }
+    final textures = all
+        .where((e) =>
+            e.$1.category == 'nature' || e.$1.category == 'noise')
+        .toList(); // already sorted by distance
+
+    final binaurals = ofCat('binaural');
+    final frequencies = ofCat('frequencies');
+
+    final result = <SoundRecommendation>[];
+
+    // 1st texture — always included (nature/noise are always available)
+    if (textures.isNotEmpty) {
+      result.add(SoundRecommendation(
+          meta: textures[0].$1, volume: 0.50, distance: textures[0].$2));
     }
 
-    // Pad to at least 3 if diversity checks left us short.
-    for (final entry in ranked) {
-      if (result.length >= 3) break;
-      if (!result.any((r) => r.$1.id == entry.$1.id)) {
-        result.add(entry);
-      }
+    // Best binaural — skip if too distant
+    if (binaurals.isNotEmpty && binaurals.first.$2 <= _maxDist) {
+      result.add(SoundRecommendation(
+          meta: binaurals.first.$1,
+          volume: 0.45,
+          distance: binaurals.first.$2));
+    }
+
+    // 2nd texture (if available)
+    if (textures.length >= 2) {
+      result.add(SoundRecommendation(
+          meta: textures[1].$1, volume: 0.30, distance: textures[1].$2));
+    }
+
+    // Best frequency — skip if too distant
+    if (frequencies.isNotEmpty && frequencies.first.$2 <= _maxDist) {
+      result.add(SoundRecommendation(
+          meta: frequencies.first.$1,
+          volume: 0.40,
+          distance: frequencies.first.$2));
     }
 
     return result;

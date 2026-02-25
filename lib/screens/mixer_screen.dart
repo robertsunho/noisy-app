@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/saved_mix.dart';
 import '../services/audio_engine.dart';
+import '../services/journey_engine.dart';
 import '../services/storage_service.dart';
 
 // ── Sound catalog ─────────────────────────────────────────────────────────────
@@ -56,12 +57,14 @@ const _kMixCategories = ['Sleep', 'Focus', 'Meditate', 'Relax', 'Energize'];
 
 class MixerScreen extends StatefulWidget {
   final AudioEngine engine;
+  final JourneyEngine journeyEngine;
   final StorageService storage;
   final VoidCallback? onMixSaved;
 
   const MixerScreen({
     super.key,
     required this.engine,
+    required this.journeyEngine,
     required this.storage,
     this.onMixSaved,
   });
@@ -95,13 +98,25 @@ class MixerScreenState extends State<MixerScreen> {
 
   void openSaveDialog() => _showSaveDialog();
 
+  // ── Layer removal ─────────────────────────────────────────────────────────
+
+  /// Stops any active journey, then removes the layer.
+  /// Manually removing a layer invalidates the journey's waypoint data,
+  /// so the journey must be stopped first.
+  Future<void> _removeLayer(String assetPath) async {
+    if (widget.journeyEngine.state != JourneyState.stopped) {
+      await widget.journeyEngine.stop();
+    }
+    await _engine.removeLayer(assetPath);
+  }
+
   // ── Sound tap ─────────────────────────────────────────────────────────────
 
   Future<void> _onSoundTapped(SoundItem sound) async {
     if (_loading.contains(sound.assetPath)) return;
 
     if (_engine.hasLayer(sound.assetPath)) {
-      await _engine.removeLayer(sound.assetPath);
+      await _removeLayer(sound.assetPath);
       return;
     }
 
@@ -308,6 +323,7 @@ class MixerScreenState extends State<MixerScreen> {
                 key: ValueKey(layers[i].assetPath),
                 layer: layers[i],
                 engine: _engine,
+                onRemove: () => _removeLayer(layers[i].assetPath),
               ),
               childCount: layers.length,
             ),
@@ -370,11 +386,13 @@ class MixerScreenState extends State<MixerScreen> {
 class _LayerCard extends StatefulWidget {
   final AudioLayer layer;
   final AudioEngine engine;
+  final VoidCallback onRemove;
 
   const _LayerCard({
     super.key,
     required this.layer,
     required this.engine,
+    required this.onRemove,
   });
 
   @override
@@ -470,8 +488,7 @@ class _LayerCardState extends State<_LayerCard> {
               padding: EdgeInsets.zero,
               constraints:
                   const BoxConstraints(minWidth: 36, minHeight: 36),
-              onPressed: () =>
-                  widget.engine.removeLayer(widget.layer.assetPath),
+              onPressed: widget.onRemove,
             ),
           ],
         ),
