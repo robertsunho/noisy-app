@@ -130,7 +130,7 @@ class JourneyEngine extends ChangeNotifier {
       } else {
         await _applyInterpolation();
         _engine?.notifyUpdate(); // keep mixer sliders in sync
-        notifyListeners();       // update journey progress UI
+        notifyListeners(); // update journey progress UI
       }
     } finally {
       _ticking = false;
@@ -139,15 +139,35 @@ class JourneyEngine extends ChangeNotifier {
 
   // ── Waypoint loading ─────────────────────────
 
-  /// Adds all SampleSources from [waypoint] into the engine at volume 0.
+  /// Preloads all source layers from [waypoint] into the engine at volume 0.
   /// Actual volumes are ramped up by [_applyInterpolation] via [_startupRamp].
   Future<void> _loadWaypoint(JourneyWaypoint waypoint) async {
     if (_engine == null) return;
     for (final src in waypoint.layers) {
-      if (src is! SampleSource) continue;
-      if (src.volume <= 0) continue;
-      if (!_engine!.hasLayer(src.assetPath)) {
-        await _engine!.addLayer(src.assetPath, _nameFromPath(src.assetPath));
+      if (src is SampleSource) {
+        if (src.volume <= 0) continue;
+        if (!_engine!.hasLayer(src.assetPath)) {
+          await _engine!.addLayer(src.assetPath, _nameFromPath(src.assetPath));
+        }
+      } else if (src is ToneSource) {
+        if (src.volume <= 0) continue;
+        final id = 'tone:${src.frequency.round()}';
+        if (!_engine!.hasLayer(id)) {
+          await _engine!
+              .addToneLayer(id, _nameFromToneId(id), src.frequency, volume: 0.0);
+        }
+      } else if (src is BinauralSource) {
+        if (src.volume <= 0) continue;
+        final id = 'binaural:${src.beatFrequency.round()}';
+        if (!_engine!.hasLayer(id)) {
+          await _engine!.addBinauralLayer(
+            id,
+            _nameFromBinauralId(id),
+            src.centerFrequency,
+            src.beatFrequency,
+            volume: 0.0,
+          );
+        }
       }
       // Volume intentionally left at 0; _applyInterpolation handles the ramp.
     }
@@ -162,14 +182,11 @@ class JourneyEngine extends ChangeNotifier {
 
     final totalWeight = _journey!.totalWeight;
     if (totalWeight <= 0) {
-      // Degenerate: no weights defined — jump to last waypoint.
       await _loadWaypoint(waypoints.last);
       return;
     }
 
     // ── Find the active segment ──────────────────
-    // Segments are defined by cumulative normalised weight boundaries.
-    // Segment i goes from waypoints[i-1] to waypoints[i].
     final p = progress;
     int fromIdx = waypoints.length - 2;
     int toIdx = waypoints.length - 1;
@@ -196,13 +213,17 @@ class JourneyEngine extends ChangeNotifier {
     final toWp = waypoints[toIdx];
     final easedT = _applyCurve(localT, toWp.curve);
 
-    // ── Build target volume map ──────────────────
-    // Keys are assetPaths; values are the interpolated target volume.
+    // ── Startup ramp ──────────────────────────────
+    final rampFactor = _stopwatch.elapsed < _startupRamp
+        ? (_stopwatch.elapsed.inMilliseconds / _startupRamp.inMilliseconds)
+            .clamp(0.0, 1.0)
+        : 1.0;
+
+    // ── Sample layer targets ──────────────────────
     final Map<String, double> targets = {};
 
     for (final src in fromWp.layers) {
       if (src is! SampleSource) continue;
-      // Find the matching source in the destination waypoint (if any).
       final toSrc = toWp.layers
           .whereType<SampleSource>()
           .where((s) => s.assetPath == src.assetPath)
@@ -210,39 +231,119 @@ class JourneyEngine extends ChangeNotifier {
       targets[src.assetPath] =
           _lerp(src.volume, toSrc?.volume ?? 0.0, easedT);
     }
-
     for (final src in toWp.layers) {
       if (src is! SampleSource) continue;
-      // Sources only in the destination: fade in from 0.
       if (!targets.containsKey(src.assetPath)) {
         targets[src.assetPath] = _lerp(0.0, src.volume, easedT);
       }
     }
 
-    // ── Apply to audio engine ────────────────────
-    // Startup ramp: scale all volumes 0→1 over the first _startupRamp so the
-    // initial mix swells in. The ramp only affects playback level, not the
-    // add/remove threshold, so layers are preloaded from the first tick.
-    final rampFactor = _stopwatch.elapsed < _startupRamp
-        ? (_stopwatch.elapsed.inMilliseconds / _startupRamp.inMilliseconds)
-            .clamp(0.0, 1.0)
-        : 1.0;
+    // ── Tone layer targets ────────────────────────
+    final Map<String, (double freq, double vol)> toneTargets = {};
 
+    for (final src in fromWp.layers) {
+      if (src is! ToneSource) continue;
+      final id = 'tone:${src.frequency.round()}';
+      final toSrc = toWp.layers
+          .whereType<ToneSource>()
+          .where((s) => 'tone:${s.frequency.round()}' == id)
+          .firstOrNull;
+      final freq =
+          _lerp(src.frequency, toSrc?.frequency ?? src.frequency, easedT);
+      final vol = _lerp(src.volume, toSrc?.volume ?? 0.0, easedT);
+      toneTargets[id] = (freq, vol);
+    }
+    for (final src in toWp.layers) {
+      if (src is! ToneSource) continue;
+      final id = 'tone:${src.frequency.round()}';
+      if (!toneTargets.containsKey(id)) {
+        toneTargets[id] = (src.frequency, _lerp(0.0, src.volume, easedT));
+      }
+    }
+
+    // ── Binaural layer targets ────────────────────
+    final Map<String, (double center, double beat, double vol)> binTargets = {};
+
+    for (final src in fromWp.layers) {
+      if (src is! BinauralSource) continue;
+      final id = 'binaural:${src.beatFrequency.round()}';
+      final toSrc = toWp.layers
+          .whereType<BinauralSource>()
+          .where((s) => 'binaural:${s.beatFrequency.round()}' == id)
+          .firstOrNull;
+      final center = _lerp(
+          src.centerFrequency,
+          toSrc?.centerFrequency ?? src.centerFrequency,
+          easedT);
+      final beat = _lerp(
+          src.beatFrequency,
+          toSrc?.beatFrequency ?? src.beatFrequency,
+          easedT);
+      final vol = _lerp(src.volume, toSrc?.volume ?? 0.0, easedT);
+      binTargets[id] = (center, beat, vol);
+    }
+    for (final src in toWp.layers) {
+      if (src is! BinauralSource) continue;
+      final id = 'binaural:${src.beatFrequency.round()}';
+      if (!binTargets.containsKey(id)) {
+        binTargets[id] = (
+          src.centerFrequency,
+          src.beatFrequency,
+          _lerp(0.0, src.volume, easedT),
+        );
+      }
+    }
+
+    // ── Apply sample layers ───────────────────────
     for (final entry in targets.entries) {
-      if (_engine == null) return; // guard: stop() may have been called
+      if (_engine == null) return;
       final path = entry.key;
       final rawVol = entry.value;
 
       if (rawVol < 0.005) {
-        // Volume effectively zero — remove layer if present.
-        if (_engine!.hasLayer(path)) {
-          await _engine!.removeLayer(path);
-        }
+        if (_engine!.hasLayer(path)) await _engine!.removeLayer(path);
       } else {
         if (!_engine!.hasLayer(path)) {
           await _engine!.addLayer(path, _nameFromPath(path));
         }
         _engine!.setVolume(path, (rawVol * rampFactor).clamp(0.0, 1.0));
+      }
+    }
+
+    // ── Apply tone layers ─────────────────────────
+    for (final entry in toneTargets.entries) {
+      if (_engine == null) return;
+      final id = entry.key;
+      final (freq, rawVol) = entry.value;
+
+      if (rawVol < 0.005) {
+        if (_engine!.hasLayer(id)) await _engine!.removeLayer(id);
+      } else {
+        if (!_engine!.hasLayer(id)) {
+          await _engine!
+              .addToneLayer(id, _nameFromToneId(id), freq, volume: 0.0);
+        }
+        _engine!.setVolume(id, (rawVol * rampFactor).clamp(0.0, 1.0));
+        _engine!.setToneFrequency(id, freq);
+      }
+    }
+
+    // ── Apply binaural layers ─────────────────────
+    for (final entry in binTargets.entries) {
+      if (_engine == null) return;
+      final id = entry.key;
+      final (center, beat, rawVol) = entry.value;
+
+      if (rawVol < 0.005) {
+        if (_engine!.hasLayer(id)) await _engine!.removeLayer(id);
+      } else {
+        if (!_engine!.hasLayer(id)) {
+          await _engine!.addBinauralLayer(
+              id, _nameFromBinauralId(id), center, beat,
+              volume: 0.0);
+        }
+        _engine!.setVolume(id, (rawVol * rampFactor).clamp(0.0, 1.0));
+        _engine!.setBinauralFrequencies(id, center, beat);
       }
     }
   }
@@ -266,7 +367,7 @@ class JourneyEngine extends ChangeNotifier {
     }
   }
 
-  /// Derives a human-readable layer name from an asset path.
+  /// Derives a human-readable layer name from a sample asset path.
   /// e.g. "assets/audio/noise/brown_noise.mp3" → "Brown Noise"
   String _nameFromPath(String assetPath) {
     final stem = assetPath.split('/').last.replaceAll('.mp3', '');
@@ -275,6 +376,28 @@ class JourneyEngine extends ChangeNotifier {
       if (w == 'hz') return 'Hz';
       return '${w[0].toUpperCase()}${w.substring(1)}';
     }).join(' ');
+  }
+
+  /// Derives a display name from a tone semantic ID.
+  /// e.g. "tone:528" → "528 Hz"
+  String _nameFromToneId(String id) {
+    final hz = id.split(':').last;
+    return '$hz Hz';
+  }
+
+  /// Derives a display name from a binaural semantic ID.
+  /// e.g. "binaural:10" → "Alpha Binaural"
+  String _nameFromBinauralId(String id) {
+    final hz = double.tryParse(id.split(':').last) ?? 10.0;
+    return '${_beatBandName(hz)} Binaural';
+  }
+
+  String _beatBandName(double hz) {
+    if (hz < 4) return 'Delta';
+    if (hz < 8) return 'Theta';
+    if (hz < 13) return 'Alpha';
+    if (hz < 30) return 'Beta';
+    return 'Gamma';
   }
 
   @override

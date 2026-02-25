@@ -22,7 +22,7 @@ class SampleSource extends SoundSource {
       : super(type: SoundSourceType.sample);
 }
 
-/// A pure sine-wave tone (placeholder — engine skips this type for now).
+/// A pure sine-wave tone played in real-time via SoLoud.
 class ToneSource extends SoundSource {
   final double frequency;
 
@@ -30,7 +30,7 @@ class ToneSource extends SoundSource {
       : super(type: SoundSourceType.tone);
 }
 
-/// A binaural beat (placeholder — engine skips this type for now).
+/// A binaural beat played in real-time via SoLoud.
 class BinauralSource extends SoundSource {
   final double centerFrequency;
   final double beatFrequency;
@@ -135,15 +135,26 @@ class Journey {
   /// Creates a two-waypoint journey that fades the engine's current mix to
   /// silence over [duration]. Snapshots layer volumes at call time.
   factory Journey.sleepTimer(AudioEngine engine, Duration duration) {
+    // Reconstructs the correct SoundSource subtype for each active layer.
+    SoundSource toSource(AudioLayer l, double vol) {
+      if (l.isTone && l.binBeatFreq != null) {
+        return BinauralSource(
+          centerFrequency: l.binCenterFreq!,
+          beatFrequency: l.binBeatFreq!,
+          volume: vol,
+        );
+      }
+      if (l.isTone && l.toneFreq != null) {
+        return ToneSource(frequency: l.toneFreq!, volume: vol);
+      }
+      return SampleSource(assetPath: l.assetPath, volume: vol);
+    }
+
     // Snapshot of current mix at current volumes.
-    final fromLayers = engine.layers
-        .map((l) => SampleSource(assetPath: l.assetPath, volume: l.volume))
-        .toList();
+    final fromLayers = engine.layers.map((l) => toSource(l, l.volume)).toList();
 
     // Same layers, all at 0.0 — the interpolation target.
-    final toLayers = engine.layers
-        .map((l) => SampleSource(assetPath: l.assetPath, volume: 0.0))
-        .toList();
+    final toLayers = engine.layers.map((l) => toSource(l, 0.0)).toList();
 
     return Journey(
       id: 'sleep_timer',

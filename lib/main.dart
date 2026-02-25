@@ -9,6 +9,7 @@ import 'services/audio_engine.dart';
 import 'services/journey_engine.dart';
 import 'services/mood_engine.dart';
 import 'services/storage_service.dart';
+import 'services/tone_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -87,6 +88,7 @@ class MainShell extends StatefulWidget {
 
 class _MainShellState extends State<MainShell> {
   int _selectedIndex = 0;
+  late final ToneService _toneService;
   late final AudioEngine _audioEngine;
   late final JourneyEngine _journeyEngine;
   late final StorageService _storageService;
@@ -102,7 +104,8 @@ class _MainShellState extends State<MainShell> {
   @override
   void initState() {
     super.initState();
-    _audioEngine = AudioEngine();
+    _toneService = ToneService();
+    _audioEngine = AudioEngine(_toneService);
     _audioEngine.addListener(_onEngineChanged);
     _journeyEngine = JourneyEngine();
     _storageService = StorageService();

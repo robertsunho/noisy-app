@@ -31,28 +31,59 @@ class MoodEngine {
     return _selectByCategory(energy, focus, warmth);
   }
 
+  /// Maps binaural catalog IDs to (centerFrequency, beatFrequency) parameters.
+  static const _binauralParams = <String, (double, double)>{
+    'delta': (150.0, 2.0),
+    'theta': (150.0, 6.0),
+    'alpha': (200.0, 10.0),
+    'beta':  (200.0, 20.0),
+    'gamma': (200.0, 40.0),
+  };
+
+  /// Parses the frequency from a solfeggio ID like "528_hz" → 528.0.
+  static double? _parseFrequency(String id) {
+    final match = RegExp(r'^(\d+)_hz$').firstMatch(id);
+    return match != null ? double.tryParse(match.group(1)!) : null;
+  }
+
   /// Creates a 3-waypoint [Journey] whose mix is tuned to the requested mood.
+  ///
+  /// Binaural and frequency sounds are emitted as [BinauralSource] /
+  /// [ToneSource] so they are played as real oscillators via SoLoud rather
+  /// than as pre-recorded MP3 files.
   Journey generateJourney(
       double energy, double focus, double warmth, Duration duration) {
     final recs = generateMix(energy, focus, warmth);
     final category = _inferCategory(energy, focus, warmth);
 
+    // Converts a recommendation to the appropriate SoundSource subtype.
+    SoundSource toSource(SoundRecommendation r, double vol) {
+      if (r.meta.category == 'binaural') {
+        final p = _binauralParams[r.meta.id];
+        if (p != null) {
+          return BinauralSource(
+              centerFrequency: p.$1, beatFrequency: p.$2, volume: vol);
+        }
+      }
+      if (r.meta.category == 'frequencies') {
+        final freq = _parseFrequency(r.meta.id);
+        if (freq != null) return ToneSource(frequency: freq, volume: vol);
+      }
+      return SampleSource(assetPath: r.meta.assetPath, volume: vol);
+    }
+
     // Waypoint 0 — starting state
     final wp0 = JourneyWaypoint(
-      layers: [
-        for (final r in recs)
-          SampleSource(assetPath: r.meta.assetPath, volume: r.volume)
-      ],
+      layers: [for (final r in recs) toSource(r, r.volume)],
     );
 
     // Waypoint 1 — slight mid-journey variation (alternating layers ±0.05)
     final wp1 = JourneyWaypoint(
       layers: [
         for (var i = 0; i < recs.length; i++)
-          SampleSource(
-            assetPath: recs[i].meta.assetPath,
-            volume: (recs[i].volume + (i.isEven ? 0.05 : -0.05))
-                .clamp(0.10, 0.70),
+          toSource(
+            recs[i],
+            (recs[i].volume + (i.isEven ? 0.05 : -0.05)).clamp(0.10, 0.70),
           )
       ],
       weight: 1.0,
@@ -61,10 +92,7 @@ class MoodEngine {
 
     // Waypoint 2 — settle back to original volumes
     final wp2 = JourneyWaypoint(
-      layers: [
-        for (final r in recs)
-          SampleSource(assetPath: r.meta.assetPath, volume: r.volume)
-      ],
+      layers: [for (final r in recs) toSource(r, r.volume)],
       weight: 1.0,
       curve: EaseCurve.easeInOut,
     );

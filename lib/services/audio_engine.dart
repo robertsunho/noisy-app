@@ -1,28 +1,88 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+import 'tone_service.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AudioLayer
+// ─────────────────────────────────────────────────────────────────────────────
 
 class AudioLayer {
   final String assetPath;
   final String name;
-  AudioPlayer _player;     // currently active player
-  AudioPlayer? _xPlayer;   // secondary player during crossfade
+
+  /// True when this layer is managed by [ToneService] rather than just_audio.
+  final bool isTone;
+
+  /// Internal ToneService ID (e.g. 'tone_0'). Non-null only when [isTone].
+  final String? _toneServiceId;
+
+  /// Frequency for pure-tone layers. Null for sample and binaural layers.
+  final double? toneFreq;
+
+  /// Center frequency for binaural layers. Null for sample and tone layers.
+  final double? binCenterFreq;
+
+  /// Beat frequency for binaural layers. Null for sample and tone layers.
+  final double? binBeatFreq;
+
+  AudioPlayer? _player;   // null for tone layers
+  AudioPlayer? _xPlayer;  // secondary player during crossfade (sample layers only)
   double volume;
-  double _xfadeT = 0.0;    // 0 = all _player, 1 = all _xPlayer
+  double _xfadeT = 0.0;
   Duration? fileDuration;
 
-  Timer? _fadeTimer;        // engine volume fades
-  Timer? _xfadeTimer;       // crossfade execution ticks
-  StreamSubscription<Duration>? _positionSub;   // crossfade trigger
-  StreamSubscription<Duration?>? _durationSub;  // waits for duration on web
+  Timer? _fadeTimer;
+  Timer? _xfadeTimer;
+  StreamSubscription<Duration>? _positionSub;
+  StreamSubscription<Duration?>? _durationSub;
 
+  /// For sample-based (just_audio) layers.
   AudioLayer({
     required this.assetPath,
     required this.name,
     required AudioPlayer player,
     this.volume = 0.0,
-  }) : _player = player;
+  })  : _player = player,
+        isTone = false,
+        _toneServiceId = null,
+        toneFreq = null,
+        binCenterFreq = null,
+        binBeatFreq = null;
+
+  /// For pure sine-wave tone layers managed by [ToneService].
+  AudioLayer.tone({
+    required this.assetPath,
+    required this.name,
+    required String toneServiceId,
+    required double frequency,
+    this.volume = 0.0,
+  })  : _player = null,
+        isTone = true,
+        _toneServiceId = toneServiceId,
+        toneFreq = frequency,
+        binCenterFreq = null,
+        binBeatFreq = null;
+
+  /// For binaural-beat layers managed by [ToneService].
+  AudioLayer.binaural({
+    required this.assetPath,
+    required this.name,
+    required String toneServiceId,
+    required double centerFrequency,
+    required double beatFrequency,
+    this.volume = 0.0,
+  })  : _player = null,
+        isTone = true,
+        _toneServiceId = toneServiceId,
+        toneFreq = null,
+        binCenterFreq = centerFrequency,
+        binBeatFreq = beatFrequency;
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AudioEngine
+// ─────────────────────────────────────────────────────────────────────────────
 
 class AudioEngine extends ChangeNotifier {
   static const int maxLayers = 5;
@@ -31,6 +91,9 @@ class AudioEngine extends ChangeNotifier {
   static const _xfadeDuration = Duration(seconds: 3);
   static const _xfadeBuffer = Duration(milliseconds: 500);
 
+  final ToneService _toneService;
+  AudioEngine(this._toneService);
+
   final List<AudioLayer> _layers = [];
 
   List<AudioLayer> get layers => List.unmodifiable(_layers);
@@ -38,9 +101,9 @@ class AudioEngine extends ChangeNotifier {
   bool hasLayer(String assetPath) =>
       _layers.any((l) => l.assetPath == assetPath);
 
-  // ── Public commands ──────────────────────────────────────────────────────
+  // ── Sample layer commands ─────────────────────────────────────────────────
 
-  /// Adds a new layer starting at volume 0 and fades it up to 0.7 over 1.5 s.
+  /// Adds a sample-based layer starting at volume 0 and fades it up to 0.7.
   Future<void> addLayer(String assetPath, String name) async {
     if (isFull || hasLayer(assetPath)) return;
 
@@ -58,16 +121,98 @@ class AudioEngine extends ChangeNotifier {
     _layers.add(layer);
     notifyListeners();
 
-    // Do NOT await play() — for non-looping players the returned Future only
-    // resolves when playback ends, which would block callers.
     unawaited(player.play());
-
     _startFade(layer, 0.7, const Duration(milliseconds: 1500));
     _setupLayerLooping(layer);
   }
 
+  // ── Tone layer commands ───────────────────────────────────────────────────
+
+  /// Adds a pure sine-wave tone layer. Use the semantic ID `tone:<hz>`.
+  Future<void> addToneLayer(
+    String id,
+    String displayName,
+    double frequency, {
+    double volume = 0.5,
+  }) async {
+    if (isFull || hasLayer(id)) return;
+    final sid = await _toneService.playTone(frequency, volume: 0.0);
+    final layer = AudioLayer.tone(
+      assetPath: id,
+      name: displayName,
+      toneServiceId: sid,
+      frequency: frequency,
+      volume: 0.0,
+    );
+    _layers.add(layer);
+    notifyListeners();
+    _startFade(layer, volume, const Duration(milliseconds: 1500));
+  }
+
+  /// Adds a binaural-beat layer. Use the semantic ID `binaural:<beatHz>`.
+  Future<void> addBinauralLayer(
+    String id,
+    String displayName,
+    double centerFreq,
+    double beatFreq, {
+    double volume = 0.5,
+  }) async {
+    if (isFull || hasLayer(id)) return;
+    final sid =
+        await _toneService.playBinaural(centerFreq, beatFreq, volume: 0.0);
+    final layer = AudioLayer.binaural(
+      assetPath: id,
+      name: displayName,
+      toneServiceId: sid,
+      centerFrequency: centerFreq,
+      beatFrequency: beatFreq,
+      volume: 0.0,
+    );
+    _layers.add(layer);
+    notifyListeners();
+    _startFade(layer, volume, const Duration(milliseconds: 1500));
+  }
+
+  // ── Tone frequency commands ───────────────────────────────────────────────
+
+  /// Updates the frequency of a pure-tone layer in real-time.
+  void setToneFrequency(String id, double frequency) {
+    final layer = _layers.where((l) => l.assetPath == id).firstOrNull;
+    if (layer == null || !layer.isTone || layer.binBeatFreq != null) return;
+    _toneService.setToneFrequency(layer._toneServiceId!, frequency);
+  }
+
+  /// Updates the center and beat frequencies of a binaural layer in real-time.
+  void setBinauralFrequencies(String id, double centerFreq, double beatFreq) {
+    final layer = _layers.where((l) => l.assetPath == id).firstOrNull;
+    if (layer == null || !layer.isTone || layer.binBeatFreq == null) return;
+    _toneService.setBinauralFrequencies(
+        layer._toneServiceId!, centerFreq, beatFreq);
+  }
+
+  // ── Volume commands ───────────────────────────────────────────────────────
+
+  /// Smoothly transitions a layer's volume to [targetVolume] over [duration].
+  void fadeToVolume(String assetPath, double targetVolume, Duration duration) {
+    final index = _layers.indexWhere((l) => l.assetPath == assetPath);
+    if (index == -1) return;
+    _startFade(_layers[index], targetVolume.clamp(0.0, 1.0), duration);
+  }
+
+  /// Instant volume change — used by the journey engine's per-tick
+  /// interpolation and by the mixer slider during active drag.
+  /// Cancels any fade in progress.
+  void setVolume(String assetPath, double volume) {
+    final index = _layers.indexWhere((l) => l.assetPath == assetPath);
+    if (index == -1) return;
+    final layer = _layers[index];
+    layer._fadeTimer?.cancel();
+    layer._fadeTimer = null;
+    layer.volume = volume.clamp(0.0, 1.0);
+    _applyLayerVolumes(layer);
+  }
+
   /// Fades the layer to 0 over ~1 s, then removes and disposes it.
-  /// Near-silent layers (≤ 0.02) skip the fade for immediate removal.
   Future<void> removeLayer(String assetPath) async {
     final index = _layers.indexWhere((l) => l.assetPath == assetPath);
     if (index == -1) return;
@@ -100,54 +245,46 @@ class AudioEngine extends ChangeNotifier {
       notifyListeners();
     }
 
-    await layer._player.stop();
-    await layer._player.dispose();
-    await layer._xPlayer?.stop();
-    await layer._xPlayer?.dispose();
-  }
-
-  /// Smoothly transitions a layer's volume to [targetVolume] over [duration].
-  void fadeToVolume(String assetPath, double targetVolume, Duration duration) {
-    final index = _layers.indexWhere((l) => l.assetPath == assetPath);
-    if (index == -1) return;
-    _startFade(_layers[index], targetVolume.clamp(0.0, 1.0), duration);
-  }
-
-  /// Instant volume change — used by the journey engine's per-tick
-  /// interpolation and by the mixer slider during active drag.
-  /// Cancels any fade in progress.
-  void setVolume(String assetPath, double volume) {
-    final index = _layers.indexWhere((l) => l.assetPath == assetPath);
-    if (index == -1) return;
-    final layer = _layers[index];
-    layer._fadeTimer?.cancel();
-    layer._fadeTimer = null;
-    layer.volume = volume.clamp(0.0, 1.0);
-    _applyLayerVolumes(layer);
+    if (layer.isTone) {
+      await _toneService.stopTone(layer._toneServiceId!);
+    } else {
+      await layer._player!.stop();
+      await layer._player!.dispose();
+      await layer._xPlayer?.stop();
+      await layer._xPlayer?.dispose();
+    }
   }
 
   /// Pushes a listener notification without modifying state.
-  /// Called by collaborators (e.g. JourneyEngine) to refresh UI listeners.
   void notifyUpdate() => notifyListeners();
 
-  // ── Private ──────────────────────────────────────────────────────────────
+  // ── Private ───────────────────────────────────────────────────────────────
 
-  /// Applies [layer.volume] to the correct player(s), accounting for any
-  /// crossfade blend in progress.
+  /// Applies [layer.volume] to the correct backend, accounting for any
+  /// crossfade blend in progress (sample layers) or delegating to
+  /// [ToneService] (tone / binaural layers).
   void _applyLayerVolumes(AudioLayer layer) {
     final v = layer.volume.clamp(0.0, 1.0);
+    if (layer.isTone) {
+      final sid = layer._toneServiceId!;
+      if (layer.binBeatFreq != null) {
+        _toneService.setBinauralVolume(sid, v);
+      } else {
+        _toneService.setToneVolume(sid, v);
+      }
+      return;
+    }
     if (layer._xPlayer == null) {
-      layer._player.setVolume(v);
+      layer._player!.setVolume(v);
     } else {
       final t = layer._xfadeT;
-      layer._player.setVolume((v * (1.0 - t)).clamp(0.0, 1.0));
+      layer._player!.setVolume((v * (1.0 - t)).clamp(0.0, 1.0));
       layer._xPlayer!.setVolume((v * t).clamp(0.0, 1.0));
     }
   }
 
   /// Linearly interpolates [layer.volume] toward [targetVolume] over
-  /// [duration] in 50 ms steps, calling [notifyListeners] on each tick so
-  /// sliders in the Mixer can follow the fade in real time.
+  /// [duration] in 50 ms steps, calling [notifyListeners] on each tick.
   void _startFade(
     AudioLayer layer,
     double targetVolume,
@@ -189,26 +326,18 @@ class AudioEngine extends ChangeNotifier {
     });
   }
 
-  // ── Seamless crossfade loop ───────────────────────────────────────────────
+  // ── Seamless crossfade loop (sample layers only) ──────────────────────────
 
-  /// Sets up seamless looping for [layer].
-  ///
-  /// Immediately applies [LoopMode.one] as a guaranteed fallback — this alone
-  /// prevents silence even if the crossfade never fires.  Then:
-  /// - If [layer.fileDuration] is already known, starts position monitoring.
-  /// - Otherwise, listens on [durationStream] (needed on web/Chrome where
-  ///   [AudioPlayer.duration] is null until the file is partially buffered),
-  ///   and starts position monitoring once the duration arrives.
   void _setupLayerLooping(AudioLayer layer) {
-    // Fallback: LoopMode.one ensures the track loops even without crossfade.
-    layer._player.setLoopMode(LoopMode.one);
+    if (layer.isTone) return; // Tone layers loop natively via SoLoud.
+
+    layer._player!.setLoopMode(LoopMode.one);
 
     if (layer.fileDuration != null) {
       _startPositionMonitor(layer);
     } else {
-      // Wait for duration to become available (common on web).
       layer._durationSub?.cancel();
-      layer._durationSub = layer._player.durationStream.listen((d) {
+      layer._durationSub = layer._player!.durationStream.listen((d) {
         if (d == null) return;
         layer.fileDuration = d;
         layer._durationSub?.cancel();
@@ -218,9 +347,6 @@ class AudioEngine extends ChangeNotifier {
     }
   }
 
-  /// Subscribes to [layer._player]'s position stream and triggers a crossfade
-  /// when the playhead is within ([_xfadeDuration] + [_xfadeBuffer]) of the
-  /// end. Works regardless of timer precision and compensates for any drift.
   void _startPositionMonitor(AudioLayer layer) {
     layer._positionSub?.cancel();
     layer._positionSub = null;
@@ -230,21 +356,18 @@ class AudioEngine extends ChangeNotifier {
 
     final threshold = _xfadeDuration + _xfadeBuffer;
 
-    layer._positionSub = layer._player.positionStream.listen((position) {
-      if (layer._xfadeTimer != null) return; // crossfade already running
-      if (position < duration - threshold) return; // too early
+    layer._positionSub = layer._player!.positionStream.listen((position) {
+      if (layer._xfadeTimer != null) return;
+      if (position < duration - threshold) return;
 
-      // Within the crossfade window — trigger the transition.
       layer._positionSub?.cancel();
       layer._positionSub = null;
       _startCrossfade(layer);
     });
   }
 
-  /// Launches a fresh secondary player and blends from [_player] to [_xPlayer]
-  /// over [_xfadeDuration]. Both players carry [LoopMode.one] so either can
-  /// survive if the crossfade fires slightly late.
   Future<void> _startCrossfade(AudioLayer layer) async {
+    if (layer.isTone) return; // Should never be called for tone layers.
     if (!_layers.contains(layer)) return;
     if (layer._xfadeTimer != null) return;
 
@@ -281,8 +404,6 @@ class AudioEngine extends ChangeNotifier {
     });
   }
 
-  /// Swaps in the secondary player as the new primary, disposes the old one,
-  /// and begins position monitoring for the next loop crossfade.
   Future<void> _completeCrossfade(AudioLayer layer) async {
     if (!_layers.contains(layer)) {
       await layer._xPlayer?.stop();
@@ -291,20 +412,18 @@ class AudioEngine extends ChangeNotifier {
       return;
     }
 
-    final oldPlayer = layer._player;
+    final oldPlayer = layer._player!;
     final newPlayer = layer._xPlayer!;
 
     layer._player = newPlayer;
     layer._xPlayer = null;
     layer._xfadeT = 0.0;
-    // Prefer the new player's duration; keep old value if still unavailable.
     layer.fileDuration = newPlayer.duration ?? layer.fileDuration;
     _applyLayerVolumes(layer);
 
     await oldPlayer.stop();
     await oldPlayer.dispose();
 
-    // New player already has LoopMode.one; start watching its position.
     _startPositionMonitor(layer);
   }
 
@@ -315,11 +434,14 @@ class AudioEngine extends ChangeNotifier {
       layer._xfadeTimer?.cancel();
       layer._positionSub?.cancel();
       layer._durationSub?.cancel();
-      layer._player.stop();
-      layer._player.dispose();
-      layer._xPlayer?.stop();
-      layer._xPlayer?.dispose();
+      if (!layer.isTone) {
+        layer._player?.stop();
+        layer._player?.dispose();
+        layer._xPlayer?.stop();
+        layer._xPlayer?.dispose();
+      }
     }
+    unawaited(_toneService.stopAll());
     _layers.clear();
     super.dispose();
   }
