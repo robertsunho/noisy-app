@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_soloud/flutter_soloud.dart';
 import 'screens/home_screen.dart';
 import 'screens/journey_screen.dart';
 import 'screens/library_screen.dart';
 import 'screens/mixer_screen.dart';
+import 'screens/tone_test_screen.dart';
 import 'services/audio_engine.dart';
 import 'services/journey_engine.dart';
 import 'services/mood_engine.dart';
 import 'services/storage_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await SoLoud.instance.init();
   runApp(const NoisyApp());
 }
 
@@ -150,7 +154,13 @@ class _MainShellState extends State<MainShell> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_titles[_selectedIndex]),
+        title: GestureDetector(
+          onLongPress: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ToneTestScreen()),
+          ),
+          child: Text(_titles[_selectedIndex]),
+        ),
         actions: _selectedIndex == 1
             ? [
                 IconButton(

@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   just_audio: ^0.10.5
   shared_preferences: ^2.3.0
+  flutter_soloud: ^3.4.10
 
 dev_dependencies:
   flutter_test:
