@@ -52,6 +52,17 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _generate() async {
     if (_isGenerating) return;
     setState(() => _isGenerating = true);
+
+    // Release journey control without fading (we're replacing everything).
+    if (widget.journeyEngine.state != JourneyState.stopped) {
+      widget.journeyEngine.abandon();
+    }
+
+    // Fade out and remove all existing layers before loading the new mix.
+    final existing =
+        widget.audioEngine.layers.map((l) => l.assetPath).toList();
+    await Future.wait(existing.map(widget.audioEngine.removeLayer));
+
     final journey = widget.moodEngine.generateJourney(
       _energy,
       _focus,
@@ -64,11 +75,6 @@ class _HomeScreenState extends State<HomeScreen> {
       Duration(minutes: _durationMinutes.round()),
     );
     if (mounted) setState(() => _isGenerating = false);
-  }
-
-  Future<void> _stopAndGenerate() async {
-    await widget.journeyEngine.stop();
-    await _generate();
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -282,7 +288,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: FilledButton.icon(
             onPressed: _isGenerating
                 ? null
-                : (_isPlaying ? _stopAndGenerate : _generate),
+                : _generate,
             icon: _isGenerating
                 ? SizedBox(
                     width: 18,
