@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import '../models/saved_mix.dart';
 import '../models/sound_meta.dart';
 import '../services/audio_engine.dart';
+import '../services/storage_service.dart';
 
 // ─── Category constants ───────────────────────────────────────────────────────
 
@@ -44,10 +46,78 @@ const _kIntentions = [
 // Library screen — top-level tab content
 // ─────────────────────────────────────────────────────────────────────────────
 
-class LibraryScreen extends StatelessWidget {
+class LibraryScreen extends StatefulWidget {
   final AudioEngine engine;
+  final StorageService storage;
 
-  const LibraryScreen({super.key, required this.engine});
+  const LibraryScreen({
+    super.key,
+    required this.engine,
+    required this.storage,
+  });
+
+  @override
+  State<LibraryScreen> createState() => LibraryScreenState();
+}
+
+class LibraryScreenState extends State<LibraryScreen> {
+  List<SavedMix> _savedMixes = [];
+
+  @override
+  void initState() {
+    super.initState();
+    loadMixes();
+  }
+
+  // ── Public API (called by MainShell via GlobalKey) ────────────────────────
+
+  Future<void> loadMixes() async {
+    final mixes = await widget.storage.loadAll();
+    mixes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    if (mounted) setState(() => _savedMixes = mixes);
+  }
+
+  // ── Mix actions ───────────────────────────────────────────────────────────
+
+  Future<void> _playSavedMix(SavedMix mix) async {
+    final existing =
+        widget.engine.layers.map((l) => l.assetPath).toList();
+    await Future.wait(existing.map(widget.engine.removeLayer));
+
+    for (final layer in mix.layers) {
+      if (widget.engine.isFull) break;
+      await widget.engine.addLayer(layer.assetPath, layer.name);
+    }
+
+    for (final layer in mix.layers) {
+      widget.engine.fadeToVolume(
+        layer.assetPath,
+        layer.volume,
+        const Duration(seconds: 2),
+      );
+    }
+  }
+
+  Future<void> _deleteMix(SavedMix mix) async {
+    setState(() => _savedMixes.removeWhere((m) => m.id == mix.id));
+    await widget.storage.delete(mix.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('"${mix.name}" deleted'),
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () async {
+            await widget.storage.save(mix);
+            await loadMixes();
+          },
+        ),
+      ),
+    );
+  }
+
+  // ── Navigation ────────────────────────────────────────────────────────────
 
   void _openSounds(
     BuildContext context, {
@@ -57,122 +127,296 @@ class LibraryScreen extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) =>
-            _SoundsScreen(engine: engine, filterTag: tag, title: title),
+        builder: (_) => _SoundsScreen(
+            engine: widget.engine, filterTag: tag, title: title),
       ),
     );
   }
+
+  // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
-      children: [
-        // ── Browse All ─────────────────────────────────────────────
-        _BrowseCard(
-          soundCount: kSoundCatalog.length,
-          onTap: () => _openSounds(context, title: 'All Sounds'),
-        ),
+    return CustomScrollView(
+      slivers: [
+        // ── My Mixes ──────────────────────────────────────────────────────
+        if (_savedMixes.isNotEmpty) ...[
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+              child: Text(
+                'MY MIXES',
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: theme.colorScheme.outline,
+                  letterSpacing: 1.8,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          SliverPadding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            sliver: SliverList(
+              delegate: SliverChildBuilderDelegate(
+                (context, index) {
+                  if (index.isOdd) return const SizedBox(height: 10);
+                  final mix = _savedMixes[index ~/ 2];
+                  return Dismissible(
+                    key: ValueKey(mix.id),
+                    direction: DismissDirection.endToStart,
+                    onDismissed: (_) => _deleteMix(mix),
+                    background: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.red.withValues(alpha: 0.8),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20),
+                      child: const Icon(Icons.delete_rounded,
+                          color: Colors.white),
+                    ),
+                    child: _MixCard(
+                      mix: mix,
+                      onPlay: () => _playSavedMix(mix),
+                    ),
+                  );
+                },
+                childCount: _savedMixes.length * 2 - 1,
+              ),
+            ),
+          ),
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+        ],
 
-        const SizedBox(height: 20),
-
-        // ── By Intention label ─────────────────────────────────────
-        Text(
-          'BY INTENTION',
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.outline,
-            letterSpacing: 1.4,
-            fontWeight: FontWeight.w600,
+        // ── Browse All ─────────────────────────────────────────────────────
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+                16, _savedMixes.isEmpty ? 20 : 0, 16, 0),
+            child: _BrowseCard(
+              soundCount: kSoundCatalog.length,
+              onTap: () => _openSounds(context, title: 'All Sounds'),
+            ),
           ),
         ),
 
-        const SizedBox(height: 10),
+        const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
-        // ── 2 + 2 + 1 intention grid ───────────────────────────────
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final cardWidth = (constraints.maxWidth - 12) / 2;
-            return Column(
-              children: [
-                Row(
+        // ── By Intention ───────────────────────────────────────────────────
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: Text(
+              'BY INTENTION',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.outline,
+                letterSpacing: 1.4,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 40),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final cardWidth = (constraints.maxWidth - 12) / 2;
+                return Column(
                   children: [
-                    SizedBox(
-                      width: cardWidth,
-                      child: _IntentionCard(
-                        intention: _kIntentions[0],
-                        onTap: () => _openSounds(
-                          context,
-                          tag: _kIntentions[0].id,
-                          title: _kIntentions[0].label,
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: cardWidth,
+                          child: _IntentionCard(
+                            intention: _kIntentions[0],
+                            onTap: () => _openSounds(
+                              context,
+                              tag: _kIntentions[0].id,
+                              title: _kIntentions[0].label,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: cardWidth,
+                          child: _IntentionCard(
+                            intention: _kIntentions[1],
+                            onTap: () => _openSounds(
+                              context,
+                              tag: _kIntentions[1].id,
+                              title: _kIntentions[1].label,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      width: cardWidth,
-                      child: _IntentionCard(
-                        intention: _kIntentions[1],
-                        onTap: () => _openSounds(
-                          context,
-                          tag: _kIntentions[1].id,
-                          title: _kIntentions[1].label,
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        SizedBox(
+                          width: cardWidth,
+                          child: _IntentionCard(
+                            intention: _kIntentions[2],
+                            onTap: () => _openSounds(
+                              context,
+                              tag: _kIntentions[2].id,
+                              title: _kIntentions[2].label,
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        SizedBox(
+                          width: cardWidth,
+                          child: _IntentionCard(
+                            intention: _kIntentions[3],
+                            onTap: () => _openSounds(
+                              context,
+                              tag: _kIntentions[3].id,
+                              title: _kIntentions[3].label,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: cardWidth,
+                          child: _IntentionCard(
+                            intention: _kIntentions[4],
+                            onTap: () => _openSounds(
+                              context,
+                              tag: _kIntentions[4].id,
+                              title: _kIntentions[4].label,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    SizedBox(
-                      width: cardWidth,
-                      child: _IntentionCard(
-                        intention: _kIntentions[2],
-                        onTap: () => _openSounds(
-                          context,
-                          tag: _kIntentions[2].id,
-                          title: _kIntentions[2].label,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    SizedBox(
-                      width: cardWidth,
-                      child: _IntentionCard(
-                        intention: _kIntentions[3],
-                        onTap: () => _openSounds(
-                          context,
-                          tag: _kIntentions[3].id,
-                          title: _kIntentions[3].label,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    SizedBox(
-                      width: cardWidth,
-                      child: _IntentionCard(
-                        intention: _kIntentions[4],
-                        onTap: () => _openSounds(
-                          context,
-                          tag: _kIntentions[4].id,
-                          title: _kIntentions[4].label,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            );
-          },
+                );
+              },
+            ),
+          ),
         ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Mix card
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _MixCard extends StatelessWidget {
+  final SavedMix mix;
+  final VoidCallback onPlay;
+
+  const _MixCard({required this.mix, required this.onPlay});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final gold = theme.colorScheme.primary;
+    final surface = theme.colorScheme.surfaceContainerHighest;
+    final onSurface = theme.colorScheme.onSurface;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onPlay,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 10, 14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              mix.name,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                color: onSurface,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (mix.category.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: gold.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: gold.withValues(alpha: 0.25),
+                                  width: 0.5,
+                                ),
+                              ),
+                              child: Text(
+                                mix.category,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: gold,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: mix.layers
+                            .map((l) => _LayerChip(label: l.name, gold: gold))
+                            .toList(),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                IgnorePointer(
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: gold.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      Icons.play_arrow_rounded,
+                      color: gold,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -227,7 +471,8 @@ class _BrowseCard extends StatelessWidget {
                     Text(
                       '$soundCount sounds',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
+                        color: theme.colorScheme.onSurface
+                            .withValues(alpha: 0.5),
                       ),
                     ),
                   ],
@@ -351,8 +596,6 @@ class _SoundsScreenState extends State<_SoundsScreen> {
     if (mounted) setState(() {});
   }
 
-  // Immediate stop — no fade. Used in dispose, errors, and when switching
-  // to a new preview (the incoming sound takes over immediately).
   void _cleanupPreview() {
     _previewFadeTimer?.cancel();
     _previewFadeTimer = null;
@@ -364,12 +607,10 @@ class _SoundsScreenState extends State<_SoundsScreen> {
     _previewVolume = 0.0;
   }
 
-  // Fade the current preview to silence over 0.5 s, then stop and dispose.
   Future<void> _stopPreviewWithFade() async {
     final player = _previewPlayer;
     if (player == null) return;
 
-    // Take ownership so nothing else touches this player during the fade.
     _previewFadeTimer?.cancel();
     _previewFadeTimer = null;
     _previewSub?.cancel();
@@ -380,7 +621,7 @@ class _SoundsScreenState extends State<_SoundsScreen> {
     _previewVolume = 0.0;
 
     if (startVol > 0.01) {
-      const steps = 10; // 500 ms / 50 ms ticks
+      const steps = 10;
       int tick = 0;
       final completer = Completer<void>();
 
@@ -403,15 +644,12 @@ class _SoundsScreenState extends State<_SoundsScreen> {
   }
 
   Future<void> _togglePreview(SoundMeta meta) async {
-    // Tapping the active preview: fade out to silence then stop.
     if (_previewingPath == meta.assetPath) {
       if (mounted) setState(() => _previewingPath = null);
       await _stopPreviewWithFade();
       return;
     }
 
-    // Switching to a different sound: cut the previous one immediately
-    // (the new audio is about to start, so a crossfade isn't needed).
     _cleanupPreview();
     if (!mounted) return;
 
@@ -428,7 +666,6 @@ class _SoundsScreenState extends State<_SoundsScreen> {
       await player.setAsset(meta.assetPath);
       await player.setVolume(0.0);
 
-      // Listen for natural completion to auto-clear preview state.
       _previewSub = player.processingStateStream.listen((state) {
         if (state == ProcessingState.completed) {
           _previewFadeTimer?.cancel();
@@ -438,21 +675,25 @@ class _SoundsScreenState extends State<_SoundsScreen> {
             _previewPlayer = null;
             _previewVolume = 0.0;
           }
-          if (mounted) setState(() { _previewingPath = null; _previewLoading = false; });
+          if (mounted) {
+            setState(() {
+              _previewingPath = null;
+              _previewLoading = false;
+            });
+          }
         }
       });
 
       unawaited(player.play());
       if (mounted) setState(() => _previewLoading = false);
 
-      // Fade in from silence to preview volume over 1.5 s.
       const targetVol = 0.7;
-      const steps = 30; // 1500 ms / 50 ms ticks
+      const steps = 30;
       int tick = 0;
 
-      _previewFadeTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      _previewFadeTimer =
+          Timer.periodic(const Duration(milliseconds: 50), (timer) {
         if (_previewPlayer != player) {
-          // This player was replaced or cleaned up — stop the timer.
           timer.cancel();
           return;
         }
@@ -470,7 +711,11 @@ class _SoundsScreenState extends State<_SoundsScreen> {
     } catch (_) {
       _cleanupPreview();
       if (mounted) {
-        setState(() { _previewingPath = null; _previewLoading = false; _previewVolume = 0.0; });
+        setState(() {
+          _previewingPath = null;
+          _previewLoading = false;
+          _previewVolume = 0.0;
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not preview ${meta.name}')),
         );
@@ -481,9 +726,6 @@ class _SoundsScreenState extends State<_SoundsScreen> {
   Future<void> _addToMix(SoundMeta meta) async {
     try {
       await widget.engine.addLayer(meta.assetPath, meta.name);
-      // Redirect the engine's built-in fade to the sound's intended default
-      // volume rather than the generic 0.7. Starting from 0, this produces
-      // a clean fade from silence to the correct target level over 1.5 s.
       widget.engine.fadeToVolume(
         meta.assetPath,
         meta.defaultVolume,
@@ -508,8 +750,6 @@ class _SoundsScreenState extends State<_SoundsScreen> {
   @override
   Widget build(BuildContext context) {
     final sounds = _filteredSounds;
-
-    // Group by category, preserving _kCategoryOrder.
     final Map<String, List<SoundMeta>> grouped = {};
     for (final s in sounds) {
       grouped.putIfAbsent(s.category, () => []).add(s);
@@ -606,14 +846,14 @@ class _SoundCardState extends State<_SoundCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Header row ──────────────────────────────────
                 Row(
                   children: [
                     Container(
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        color: gold.withValues(alpha: isInMix ? 0.18 : 0.1),
+                        color:
+                            gold.withValues(alpha: isInMix ? 0.18 : 0.1),
                         borderRadius: BorderRadius.circular(9),
                       ),
                       child: Icon(
@@ -643,8 +883,8 @@ class _SoundCardState extends State<_SoundCard> {
                       _Badge(
                         label: 'Soon',
                         color: theme.colorScheme.outline,
-                        bgColor:
-                            theme.colorScheme.outline.withValues(alpha: 0.1),
+                        bgColor: theme.colorScheme.outline
+                            .withValues(alpha: 0.1),
                       ),
                       const SizedBox(width: 8),
                     ],
@@ -659,8 +899,6 @@ class _SoundCardState extends State<_SoundCard> {
                     ),
                   ],
                 ),
-
-                // ── Expandable content ───────────────────────────
                 AnimatedCrossFade(
                   duration: const Duration(milliseconds: 200),
                   sizeCurve: Curves.easeInOut,
@@ -686,8 +924,7 @@ class _SoundCardState extends State<_SoundCard> {
   Widget _buildAvailableContent(
       BuildContext context, bool isInMix, Color gold) {
     final theme = Theme.of(context);
-    final isFull =
-        widget.engine.isFull && !isInMix;
+    final isFull = widget.engine.isFull && !isInMix;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -704,7 +941,6 @@ class _SoundCardState extends State<_SoundCard> {
         ],
         Row(
           children: [
-            // Preview button
             OutlinedButton.icon(
               onPressed: widget.onPreview,
               icon: widget.isPreviewLoading
@@ -732,8 +968,8 @@ class _SoundCardState extends State<_SoundCard> {
                       ? gold.withValues(alpha: 0.6)
                       : theme.colorScheme.outline.withValues(alpha: 0.35),
                 ),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
                 textStyle: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
@@ -744,7 +980,6 @@ class _SoundCardState extends State<_SoundCard> {
               ),
             ),
             const SizedBox(width: 10),
-            // Add to Mix button
             FilledButton.icon(
               onPressed: isInMix || isFull ? null : widget.onAddToMix,
               icon: Icon(
@@ -761,8 +996,8 @@ class _SoundCardState extends State<_SoundCard> {
                 foregroundColor: const Color(0xFF1C1C1C),
                 disabledBackgroundColor: gold.withValues(alpha: 0.12),
                 disabledForegroundColor: gold.withValues(alpha: 0.4),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 8),
                 textStyle: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
@@ -879,6 +1114,36 @@ class _Badge extends StatelessWidget {
           fontWeight: FontWeight.w600,
           color: color,
           letterSpacing: 0.3,
+        ),
+      ),
+    );
+  }
+}
+
+class _LayerChip extends StatelessWidget {
+  final String label;
+  final Color gold;
+
+  const _LayerChip({required this.label, required this.gold});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: gold.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: gold.withValues(alpha: 0.12),
+          width: 0.5,
+        ),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11,
+          color: gold.withValues(alpha: 0.65),
+          letterSpacing: 0.2,
         ),
       ),
     );

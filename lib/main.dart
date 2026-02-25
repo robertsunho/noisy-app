@@ -5,6 +5,7 @@ import 'screens/library_screen.dart';
 import 'screens/mixer_screen.dart';
 import 'services/audio_engine.dart';
 import 'services/journey_engine.dart';
+import 'services/mood_engine.dart';
 import 'services/storage_service.dart';
 
 void main() {
@@ -85,10 +86,11 @@ class _MainShellState extends State<MainShell> {
   late final AudioEngine _audioEngine;
   late final JourneyEngine _journeyEngine;
   late final StorageService _storageService;
+  late final MoodEngine _moodEngine;
   late final List<Widget> _screens;
 
-  // GlobalKeys allow MainShell to call public methods on screen states.
-  final _homeKey = GlobalKey<HomeScreenState>();
+  // GlobalKey for LibraryScreen so we can call loadMixes() after a save.
+  final _libraryKey = GlobalKey<LibraryScreenState>();
   final _mixerKey = GlobalKey<MixerScreenState>();
 
   static const List<String> _titles = ['Noisy', 'Mixer', 'Library', 'Journey'];
@@ -100,24 +102,30 @@ class _MainShellState extends State<MainShell> {
     _audioEngine.addListener(_onEngineChanged);
     _journeyEngine = JourneyEngine();
     _storageService = StorageService();
+    _moodEngine = MoodEngine();
 
     _screens = [
       HomeScreen(
-        key: _homeKey,
         audioEngine: _audioEngine,
         journeyEngine: _journeyEngine,
-        storage: _storageService,
+        moodEngine: _moodEngine,
       ),
       MixerScreen(
         key: _mixerKey,
         engine: _audioEngine,
         storage: _storageService,
-        // After a mix is saved from the Mixer, refresh the Home list.
-        onMixSaved: () => _homeKey.currentState?.loadMixes(),
+        // After a mix is saved from the Mixer, refresh the Library list.
+        onMixSaved: () => _libraryKey.currentState?.loadMixes(),
       ),
-      LibraryScreen(engine: _audioEngine),
+      LibraryScreen(
+        key: _libraryKey,
+        engine: _audioEngine,
+        storage: _storageService,
+      ),
       JourneyScreen(
-          audioEngine: _audioEngine, journeyEngine: _journeyEngine),
+        audioEngine: _audioEngine,
+        journeyEngine: _journeyEngine,
+      ),
     ];
   }
 
@@ -158,7 +166,7 @@ class _MainShellState extends State<MainShell> {
             : null,
       ),
       // IndexedStack keeps all screens alive so their state is preserved
-      // across tab switches (e.g. HomeScreen's saved mixes list).
+      // across tab switches.
       body: IndexedStack(
         index: _selectedIndex,
         children: _screens,
@@ -166,10 +174,9 @@ class _MainShellState extends State<MainShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
-          // Refresh the saved mixes list whenever the user returns to Home
-          // in case they saved a new mix from the Mixer tab.
-          if (index == 0 && _selectedIndex != 0) {
-            _homeKey.currentState?.loadMixes();
+          // Refresh the saved mixes list whenever the user switches to Library.
+          if (index == 2 && _selectedIndex != 2) {
+            _libraryKey.currentState?.loadMixes();
           }
           setState(() => _selectedIndex = index);
         },
