@@ -29,6 +29,10 @@ class AudioLayer {
   AudioPlayer? _player;   // null for tone layers
   AudioPlayer? _xPlayer;  // secondary player during crossfade (sample layers only)
   double volume;
+
+  /// Current playback speed ratio used to approximate pitch shifting.
+  /// 1.0 = no shift. Only meaningful for sample-based layers.
+  double pitchShiftRatio = 1.0;
   double _xfadeT = 0.0;
   Duration? fileDuration;
 
@@ -210,6 +214,20 @@ class AudioEngine extends ChangeNotifier {
     layer._fadeTimer = null;
     layer.volume = volume.clamp(0.0, 1.0);
     _applyLayerVolumes(layer);
+  }
+
+  /// Sets the playback speed of a sample-based layer to approximate pitch
+  /// shifting. [ratio] comes from [HarmonicMatcher] (e.g. 1.059 ≈ +1 st).
+  ///
+  /// TODO: Migrate to flutter_soloud setRelativePlaySpeed once soundscape
+  /// layers use SoLoud, for true pitch-shift-without-tempo-change.
+  void setPitchShift(String assetPath, double ratio) {
+    final index = _layers.indexWhere((l) => l.assetPath == assetPath);
+    if (index == -1) return;
+    final layer = _layers[index];
+    if (layer.isTone) return; // Tone layers don't use just_audio speed.
+    layer.pitchShiftRatio = ratio;
+    layer._player?.setSpeed(ratio);
   }
 
   /// Fades the layer to 0 over ~1 s, then removes and disposes it.

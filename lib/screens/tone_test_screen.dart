@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/harmonic_matcher.dart';
 import '../services/tone_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,6 +27,31 @@ class ToneTestScreen extends StatefulWidget {
 
 class _ToneTestScreenState extends State<ToneTestScreen> {
   final _service = ToneService();
+
+  // ── Harmonic Matcher state ─────────────────────────────────────────────────
+  static const _rootKeys = <String, double>{
+    'C': 261.63,
+    'D': 293.66,
+    'E': 329.63,
+    'F': 349.23,
+    'G': 392.00,
+    'A': 440.00,
+    'B': 493.88,
+  };
+  static const _solfeggioFreqs = [
+    174, 285, 396, 417, 432, 528, 639, 741, 852, 963
+  ];
+  String _selectedRootKey = 'C';
+  int _selectedSolfeggio = 528;
+  HarmonicMatch? _matchResult;
+
+  void _calculateHarmonicMatch() {
+    final rootHz = _rootKeys[_selectedRootKey]!;
+    setState(() {
+      _matchResult = HarmonicMatcher.findBestMatch(
+          rootHz, _selectedSolfeggio.toDouble());
+    });
+  }
 
   // ── Tone state ─────────────────────────────────────────────────────────────
   double _toneFreq = 440.0;
@@ -258,6 +284,113 @@ class _ToneTestScreenState extends State<ToneTestScreen> {
             ],
           ),
 
+          const SizedBox(height: 16),
+
+          // ── Harmonic Matcher section ──────────────────────────────────────
+          _SectionCard(
+            label: 'HARMONIC MATCHER',
+            children: [
+              // Root key chips
+              Text(
+                'Soundscape Root Key',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: _rootKeys.keys.map((key) => _KeyChip(
+                  label: key,
+                  selected: _selectedRootKey == key,
+                  onTap: () => setState(() {
+                    _selectedRootKey = key;
+                    _matchResult = null;
+                  }),
+                  gold: gold,
+                )).toList(),
+              ),
+              const SizedBox(height: 12),
+
+              // Solfeggio target chips
+              Text(
+                'Solfeggio Target (Hz)',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: _solfeggioFreqs.map((hz) => _KeyChip(
+                  label: '$hz',
+                  selected: _selectedSolfeggio == hz,
+                  onTap: () => setState(() {
+                    _selectedSolfeggio = hz;
+                    _matchResult = null;
+                  }),
+                  gold: gold,
+                )).toList(),
+              ),
+              const SizedBox(height: 12),
+
+              // Calculate button
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _calculateHarmonicMatch,
+                  icon: const Icon(Icons.calculate_outlined),
+                  label: const Text('Calculate Match'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: gold,
+                    foregroundColor: const Color(0xFF1C1C1C),
+                    padding: const EdgeInsets.symmetric(vertical: 13),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Results
+              if (_matchResult case final m?) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: gold.withValues(alpha: 0.07),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: gold.withValues(alpha: 0.25)),
+                  ),
+                  child: Column(
+                    children: [
+                      _ResultRow(
+                          label: 'Interval',
+                          value: m.intervalName,
+                          gold: gold),
+                      _ResultRow(
+                          label: 'Shift',
+                          value: '${m.shiftSemitones >= 0 ? '+' : ''}'
+                              '${m.shiftSemitones.toStringAsFixed(2)} st',
+                          gold: gold),
+                      _ResultRow(
+                          label: 'Ratio',
+                          value: '${m.shiftRatio.toStringAsFixed(4)}×',
+                          gold: gold),
+                      _ResultRow(
+                          label: 'New root',
+                          value: '${m.resultingRootHz.toStringAsFixed(1)} Hz',
+                          gold: gold),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+
           const SizedBox(height: 24),
 
           // ── Stop All ─────────────────────────────────────────────────────
@@ -402,6 +535,91 @@ class _SliderRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Harmonic Matcher widgets
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _KeyChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  final Color gold;
+
+  const _KeyChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    required this.gold,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 120),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? gold.withValues(alpha: 0.18) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: selected ? gold : gold.withValues(alpha: 0.25),
+            width: selected ? 1.5 : 1.0,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: selected ? gold : gold.withValues(alpha: 0.55),
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ResultRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color gold;
+
+  const _ResultRow({
+    required this.label,
+    required this.value,
+    required this.gold,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+            ),
+          ),
+          Text(
+            value,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: gold,
+              fontWeight: FontWeight.w600,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

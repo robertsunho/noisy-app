@@ -3,7 +3,7 @@ class SoundMeta {
   final String name;
   final String assetPath;
 
-  /// One of: 'nature' | 'noise' | 'binaural' | 'frequencies'
+  /// One of: 'nature' | 'noise' | 'binaural' | 'frequencies' | 'soundscape'
   final String category;
 
   final String description;
@@ -14,6 +14,10 @@ class SoundMeta {
   final double defaultVolume;
   final bool isAvailable;
 
+  /// Tonal center of the sound in Hz at standard A=440 tuning.
+  /// Null for atonal sounds (nature, noise, binaural).
+  final double? rootFrequency;
+
   const SoundMeta({
     required this.id,
     required this.name,
@@ -23,6 +27,7 @@ class SoundMeta {
     required this.tags,
     required this.defaultVolume,
     this.isAvailable = true,
+    this.rootFrequency,
   });
 }
 
@@ -344,5 +349,40 @@ const List<SoundMeta> kSoundCatalog = [
     description: 'The highest Solfeggio frequency. Associated with awakening and unity.',
     tags: ['meditate', 'energize'],
     defaultVolume: 0.35,
+  ),
+
+  // ── Soundscapes (coming soon) ────────────────────────────────────────────────
+  SoundMeta(
+    id: 'ambient_calm',
+    name: 'Calm Drift',
+    assetPath: 'assets/audio/soundscapes/ambient_calm.mp3',
+    category: 'soundscape',
+    description: 'Gentle ambient atmosphere',
+    tags: ['sleep', 'relax', 'meditate'],
+    defaultVolume: 0.5,
+    isAvailable: false,
+    rootFrequency: 261.63, // C4
+  ),
+  SoundMeta(
+    id: 'ambient_focus',
+    name: 'Sharp Light',
+    assetPath: 'assets/audio/soundscapes/ambient_focus.mp3',
+    category: 'soundscape',
+    description: 'Bright focused atmosphere',
+    tags: ['focus', 'energize'],
+    defaultVolume: 0.5,
+    isAvailable: false,
+    rootFrequency: 349.23, // F4
+  ),
+  SoundMeta(
+    id: 'ambient_deep',
+    name: 'Deep Current',
+    assetPath: 'assets/audio/soundscapes/ambient_deep.mp3',
+    category: 'soundscape',
+    description: 'Dark immersive atmosphere',
+    tags: ['sleep', 'meditate'],
+    defaultVolume: 0.5,
+    isAvailable: false,
+    rootFrequency: 293.66, // D4
   ),
 ];
