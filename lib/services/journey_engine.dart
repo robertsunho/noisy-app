@@ -124,13 +124,12 @@ class JourneyEngine extends ChangeNotifier {
     _ticking = true;
     try {
       if (_stopwatch.elapsed >= _totalDuration) {
-        // Apply the exact final state before tearing down.
         await _applyInterpolation();
         await stop();
       } else {
         await _applyInterpolation();
-        _engine?.notifyUpdate(); // keep mixer sliders in sync
-        notifyListeners(); // update journey progress UI
+        _engine?.notifyUpdate();
+        notifyListeners();
       }
     } finally {
       _ticking = false;
@@ -144,7 +143,13 @@ class JourneyEngine extends ChangeNotifier {
   Future<void> _loadWaypoint(JourneyWaypoint waypoint) async {
     if (_engine == null) return;
     for (final src in waypoint.layers) {
-      if (src is SampleSource) {
+      if (src is SoundscapeSource) {
+        if (src.volume <= 0) continue;
+        if (!_engine!.hasLayer(src.assetPath)) {
+          await _engine!.addLayer(src.assetPath, _nameFromPath(src.assetPath));
+          _engine!.setPitchShift(src.assetPath, src.pitchShiftRatio);
+        }
+      } else if (src is SampleSource) {
         if (src.volume <= 0) continue;
         if (!_engine!.hasLayer(src.assetPath)) {
           await _engine!.addLayer(src.assetPath, _nameFromPath(src.assetPath));
@@ -219,6 +224,29 @@ class JourneyEngine extends ChangeNotifier {
             .clamp(0.0, 1.0)
         : 1.0;
 
+    // ── Soundscape layer targets ──────────────────
+    // Keyed by assetPath; value = (pitchShiftRatio, volume).
+    final Map<String, (double pitch, double vol)> soundscapeTargets = {};
+
+    for (final src in fromWp.layers) {
+      if (src is! SoundscapeSource) continue;
+      final toSrc = toWp.layers
+          .whereType<SoundscapeSource>()
+          .where((s) => s.assetPath == src.assetPath)
+          .firstOrNull;
+      final pitch = _lerp(src.pitchShiftRatio,
+          toSrc?.pitchShiftRatio ?? src.pitchShiftRatio, easedT);
+      final vol = _lerp(src.volume, toSrc?.volume ?? 0.0, easedT);
+      soundscapeTargets[src.assetPath] = (pitch, vol);
+    }
+    for (final src in toWp.layers) {
+      if (src is! SoundscapeSource) continue;
+      if (!soundscapeTargets.containsKey(src.assetPath)) {
+        soundscapeTargets[src.assetPath] =
+            (src.pitchShiftRatio, _lerp(0.0, src.volume, easedT));
+      }
+    }
+
     // ── Sample layer targets ──────────────────────
     final Map<String, double> targets = {};
 
@@ -271,14 +299,10 @@ class JourneyEngine extends ChangeNotifier {
           .whereType<BinauralSource>()
           .where((s) => 'binaural:${s.beatFrequency.round()}' == id)
           .firstOrNull;
-      final center = _lerp(
-          src.centerFrequency,
-          toSrc?.centerFrequency ?? src.centerFrequency,
-          easedT);
-      final beat = _lerp(
-          src.beatFrequency,
-          toSrc?.beatFrequency ?? src.beatFrequency,
-          easedT);
+      final center = _lerp(src.centerFrequency,
+          toSrc?.centerFrequency ?? src.centerFrequency, easedT);
+      final beat = _lerp(src.beatFrequency,
+          toSrc?.beatFrequency ?? src.beatFrequency, easedT);
       final vol = _lerp(src.volume, toSrc?.volume ?? 0.0, easedT);
       binTargets[id] = (center, beat, vol);
     }
@@ -291,6 +315,24 @@ class JourneyEngine extends ChangeNotifier {
           src.beatFrequency,
           _lerp(0.0, src.volume, easedT),
         );
+      }
+    }
+
+    // ── Apply soundscape layers ───────────────────
+    for (final entry in soundscapeTargets.entries) {
+      if (_engine == null) return;
+      final path = entry.key;
+      final (pitch, rawVol) = entry.value;
+
+      if (rawVol < 0.005) {
+        if (_engine!.hasLayer(path)) await _engine!.removeLayer(path);
+      } else {
+        if (!_engine!.hasLayer(path)) {
+          await _engine!.addLayer(path, _nameFromPath(path));
+          _engine!.setPitchShift(path, pitch);
+        }
+        _engine!.setVolume(path, (rawVol * rampFactor).clamp(0.0, 1.0));
+        _engine!.setPitchShift(path, pitch);
       }
     }
 
@@ -367,7 +409,7 @@ class JourneyEngine extends ChangeNotifier {
     }
   }
 
-  /// Derives a human-readable layer name from a sample asset path.
+  /// Derives a display name from a sample asset path.
   /// e.g. "assets/audio/noise/brown_noise.mp3" → "Brown Noise"
   String _nameFromPath(String assetPath) {
     final stem = assetPath.split('/').last.replaceAll('.mp3', '');
@@ -378,14 +420,12 @@ class JourneyEngine extends ChangeNotifier {
     }).join(' ');
   }
 
-  /// Derives a display name from a tone semantic ID.
   /// e.g. "tone:528" → "528 Hz"
   String _nameFromToneId(String id) {
     final hz = id.split(':').last;
     return '$hz Hz';
   }
 
-  /// Derives a display name from a binaural semantic ID.
   /// e.g. "binaural:10" → "Alpha Binaural"
   String _nameFromBinauralId(String id) {
     final hz = double.tryParse(id.split(':').last) ?? 10.0;

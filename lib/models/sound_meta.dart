@@ -351,38 +351,105 @@ const List<SoundMeta> kSoundCatalog = [
     defaultVolume: 0.35,
   ),
 
-  // ── Soundscapes (coming soon) ────────────────────────────────────────────────
+  // ── Soundscapes ──────────────────────────────────────────────────────────────
   SoundMeta(
-    id: 'ambient_calm',
-    name: 'Calm Drift',
-    assetPath: 'assets/audio/soundscapes/ambient_calm.mp3',
+    id: 'warm_drift',
+    name: 'Warm Drift',
+    assetPath: 'assets/audio/soundscapes/warm_drift_f_maj.mp3',
     category: 'soundscape',
-    description: 'Gentle ambient atmosphere',
+    description: 'A gentle, enveloping warmth that slowly drifts and dissolves',
     tags: ['sleep', 'relax', 'meditate'],
     defaultVolume: 0.5,
-    isAvailable: false,
-    rootFrequency: 261.63, // C4
-  ),
-  SoundMeta(
-    id: 'ambient_focus',
-    name: 'Sharp Light',
-    assetPath: 'assets/audio/soundscapes/ambient_focus.mp3',
-    category: 'soundscape',
-    description: 'Bright focused atmosphere',
-    tags: ['focus', 'energize'],
-    defaultVolume: 0.5,
-    isAvailable: false,
     rootFrequency: 349.23, // F4
   ),
   SoundMeta(
-    id: 'ambient_deep',
+    id: 'deep_current',
     name: 'Deep Current',
-    assetPath: 'assets/audio/soundscapes/ambient_deep.mp3',
+    assetPath: 'assets/audio/soundscapes/deep_current_d_maj.mp3',
     category: 'soundscape',
-    description: 'Dark immersive atmosphere',
+    description: 'Dark undercurrents flowing through an immersive depth',
     tags: ['sleep', 'meditate'],
     defaultVolume: 0.5,
-    isAvailable: false,
     rootFrequency: 293.66, // D4
+  ),
+  SoundMeta(
+    id: 'open_sky',
+    name: 'Open Sky',
+    assetPath: 'assets/audio/soundscapes/open_sky_g_maj.mp3',
+    category: 'soundscape',
+    description: 'Wide open atmosphere with a sense of expansiveness',
+    tags: ['relax', 'meditate', 'energize'],
+    defaultVolume: 0.5,
+    rootFrequency: 392.00, // G4
+  ),
+  SoundMeta(
+    id: 'soft_veil',
+    name: 'Soft Veil',
+    assetPath: 'assets/audio/soundscapes/soft_veil_ab_maj.mp3',
+    category: 'soundscape',
+    description: 'A delicate, translucent layer of soft ambience',
+    tags: ['sleep', 'relax'],
+    defaultVolume: 0.5,
+    rootFrequency: 415.30, // Ab4
+  ),
+  SoundMeta(
+    id: 'golden_haze',
+    name: 'Golden Haze',
+    assetPath: 'assets/audio/soundscapes/golden_haze_a_maj.mp3',
+    category: 'soundscape',
+    description: 'Warm golden tones shimmering through a gentle haze',
+    tags: ['relax', 'meditate', 'focus'],
+    defaultVolume: 0.5,
+    rootFrequency: 440.00, // A4
+  ),
+  SoundMeta(
+    id: 'luminous_calm',
+    name: 'Luminous Calm',
+    assetPath: 'assets/audio/soundscapes/luminous_calm_c_maj.mp3',
+    category: 'soundscape',
+    description: 'Radiant stillness with a luminous, peaceful quality',
+    tags: ['relax', 'meditate', 'sleep'],
+    defaultVolume: 0.5,
+    rootFrequency: 261.63, // C4
+  ),
+  SoundMeta(
+    id: 'bright_pulse',
+    name: 'Bright Pulse',
+    assetPath: 'assets/audio/soundscapes/bright_pulse_e_maj.mp3',
+    category: 'soundscape',
+    description: 'Crisp and vibrant energy with a forward momentum',
+    tags: ['focus', 'energize'],
+    defaultVolume: 0.5,
+    rootFrequency: 329.63, // E4
+  ),
+  SoundMeta(
+    id: 'shadow_weave',
+    name: 'Shadow Weave',
+    assetPath: 'assets/audio/soundscapes/shadow_weave_fs_min.mp3',
+    category: 'soundscape',
+    description: 'Dark, intricate textures woven through shadow',
+    tags: ['sleep', 'meditate'],
+    defaultVolume: 0.5,
+    rootFrequency: 369.99, // F#4
+  ),
+  SoundMeta(
+    id: 'still_waters',
+    name: 'Still Waters',
+    assetPath: 'assets/audio/soundscapes/still_waters_a_min.mp3',
+    category: 'soundscape',
+    description: 'Calm, reflective surface with hidden depths beneath',
+    tags: ['sleep', 'relax', 'meditate'],
+    defaultVolume: 0.5,
+    rootFrequency: 440.00, // A4
+  ),
+  SoundMeta(
+    id: 'crystal_ascent',
+    name: 'Crystal Ascent',
+    assetPath: 'assets/audio/soundscapes/crystal_ascent_b_maj.mp3',
+    category: 'soundscape',
+    description: 'Bright crystalline tones rising with clarity and purpose',
+    tags: ['focus', 'energize', 'meditate'],
+    defaultVolume: 0.5,
+    rootFrequency: 493.88, // B4
   ),
 ];

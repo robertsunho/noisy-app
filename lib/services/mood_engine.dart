@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/journey.dart';
 import '../models/mood_profile.dart';
 import '../models/sound_meta.dart';
+import 'harmonic_matcher.dart';
 
 class SoundRecommendation {
   final SoundMeta meta;
@@ -67,6 +68,20 @@ class MoodEngine {
 
     // Converts a recommendation to the appropriate SoundSource subtype.
     SoundSource toSource(SoundRecommendation r, double vol) {
+      if (r.meta.category == 'soundscape') {
+        final rootHz = r.meta.rootFrequency;
+        double shiftRatio = 1.0;
+        if (rootHz != null && solfeggioFreq != null) {
+          shiftRatio = HarmonicMatcher.findBestMatch(rootHz, solfeggioFreq)
+              .shiftRatio;
+        }
+        return SoundscapeSource(
+          assetPath: r.meta.assetPath,
+          volume: vol,
+          pitchShiftRatio: shiftRatio,
+          rootFrequency: rootHz ?? 440.0,
+        );
+      }
       if (r.meta.category == 'binaural') {
         final p = _binauralParams[r.meta.id];
         if (p != null) {
@@ -123,10 +138,13 @@ class MoodEngine {
 
   // ── Private helpers ───────────────────────────────────────────────────────
 
-  /// Build the balanced mix: 2 textures + up to 1 binaural + up to 1 frequency.
+  /// Builds the balanced mix with 4 category slots:
+  ///   1. Best soundscape   → vol 0.55 (primary atmospheric layer)
+  ///   2. Best texture      → vol 0.40 (nature/noise complement)
+  ///   3. Best binaural     → vol 0.40 (skip if distance > 1.2)
+  ///   4. Best frequency    → vol 0.35 (skip if distance > 1.2)
   List<SoundRecommendation> _selectByCategory(
       double energy, double focus, double warmth) {
-    // Per-category sorted lists (closest first).
     final all = kSoundCatalog
         .where((s) => s.isAvailable && kMoodProfiles.containsKey(s.id))
         .map((s) {
@@ -139,41 +157,44 @@ class MoodEngine {
     List<(SoundMeta, double)> ofCat(String cat) =>
         all.where((e) => e.$1.category == cat).toList();
 
+    final soundscapes = ofCat('soundscape');
     final textures = all
-        .where((e) =>
-            e.$1.category == 'nature' || e.$1.category == 'noise')
-        .toList(); // already sorted by distance
-
+        .where((e) => e.$1.category == 'nature' || e.$1.category == 'noise')
+        .toList();
     final binaurals = ofCat('binaural');
     final frequencies = ofCat('frequencies');
 
     final result = <SoundRecommendation>[];
 
-    // 1st texture — always included (nature/noise are always available)
+    // Best soundscape — primary atmospheric layer
+    if (soundscapes.isNotEmpty) {
+      result.add(SoundRecommendation(
+          meta: soundscapes.first.$1,
+          volume: 0.55,
+          distance: soundscapes.first.$2));
+    }
+
+    // Best texture (nature/noise)
     if (textures.isNotEmpty) {
       result.add(SoundRecommendation(
-          meta: textures[0].$1, volume: 0.50, distance: textures[0].$2));
+          meta: textures.first.$1,
+          volume: 0.40,
+          distance: textures.first.$2));
     }
 
     // Best binaural — skip if too distant
     if (binaurals.isNotEmpty && binaurals.first.$2 <= _maxDist) {
       result.add(SoundRecommendation(
           meta: binaurals.first.$1,
-          volume: 0.45,
+          volume: 0.40,
           distance: binaurals.first.$2));
-    }
-
-    // 2nd texture (if available)
-    if (textures.length >= 2) {
-      result.add(SoundRecommendation(
-          meta: textures[1].$1, volume: 0.30, distance: textures[1].$2));
     }
 
     // Best frequency — skip if too distant
     if (frequencies.isNotEmpty && frequencies.first.$2 <= _maxDist) {
       result.add(SoundRecommendation(
           meta: frequencies.first.$1,
-          volume: 0.40,
+          volume: 0.35,
           distance: frequencies.first.$2));
     }
 

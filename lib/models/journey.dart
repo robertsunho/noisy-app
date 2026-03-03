@@ -5,7 +5,7 @@ import '../services/audio_engine.dart';
 // Sound source hierarchy
 // ─────────────────────────────────────────────
 
-enum SoundSourceType { sample, tone, binaural }
+enum SoundSourceType { sample, tone, binaural, soundscape }
 
 abstract class SoundSource {
   final double volume;
@@ -28,6 +28,27 @@ class ToneSource extends SoundSource {
 
   const ToneSource({required this.frequency, required super.volume})
       : super(type: SoundSourceType.tone);
+}
+
+/// A soundscape MP3 with an optional harmonic pitch-shift applied via
+/// [AudioEngine.setPitchShift]. Behaves like [SampleSource] for playback
+/// but carries [pitchShiftRatio] and [rootFrequency] metadata.
+class SoundscapeSource extends SoundSource {
+  final String assetPath;
+
+  /// Playback speed ratio computed by [HarmonicMatcher] to align the
+  /// soundscape's root with the solfeggio tone in the mix. 1.0 = no shift.
+  final double pitchShiftRatio;
+
+  /// The soundscape's tonal root in Hz at standard A=440 tuning.
+  final double rootFrequency;
+
+  const SoundscapeSource({
+    required this.assetPath,
+    required super.volume,
+    this.pitchShiftRatio = 1.0,
+    required this.rootFrequency,
+  }) : super(type: SoundSourceType.soundscape);
 }
 
 /// A binaural beat played in real-time via SoLoud.

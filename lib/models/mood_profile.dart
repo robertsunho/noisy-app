@@ -49,6 +49,18 @@ const Map<String, MoodProfile> kMoodProfiles = {
   'beta':  MoodProfile(energy: 0.70, focus: 0.85, warmth: 0.30),
   'gamma': MoodProfile(energy: 0.85, focus: 0.90, warmth: 0.20),
 
+  // ── Soundscapes ───────────────────────────────────────────────────────────
+  'warm_drift':    MoodProfile(energy: 0.15, focus: 0.20, warmth: 0.70),
+  'deep_current':  MoodProfile(energy: 0.10, focus: 0.25, warmth: 0.15),
+  'open_sky':      MoodProfile(energy: 0.50, focus: 0.35, warmth: 0.65),
+  'soft_veil':     MoodProfile(energy: 0.10, focus: 0.15, warmth: 0.55),
+  'golden_haze':   MoodProfile(energy: 0.35, focus: 0.45, warmth: 0.75),
+  'luminous_calm': MoodProfile(energy: 0.20, focus: 0.30, warmth: 0.60),
+  'bright_pulse':  MoodProfile(energy: 0.70, focus: 0.75, warmth: 0.65),
+  'shadow_weave':  MoodProfile(energy: 0.10, focus: 0.20, warmth: 0.20),
+  'still_waters':  MoodProfile(energy: 0.15, focus: 0.25, warmth: 0.40),
+  'crystal_ascent':MoodProfile(energy: 0.55, focus: 0.65, warmth: 0.80),
+
   // ── Solfeggio frequencies ─────────────────────────────────────────────────
   '174_hz': MoodProfile(energy: 0.20, focus: 0.20, warmth: 0.60),
   '285_hz': MoodProfile(energy: 0.20, focus: 0.25, warmth: 0.65),
