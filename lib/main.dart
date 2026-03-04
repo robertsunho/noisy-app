@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';
 import 'screens/home_screen.dart';
 import 'screens/journey_screen.dart';
@@ -7,6 +8,7 @@ import 'screens/mixer_screen.dart';
 import 'screens/tone_test_screen.dart';
 import 'services/audio_engine.dart';
 import 'services/journey_engine.dart';
+import 'services/llm_service.dart';
 import 'services/mood_engine.dart';
 import 'services/motif_engine.dart';
 import 'services/storage_service.dart';
@@ -14,6 +16,7 @@ import 'services/tone_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load();
   await SoLoud.instance.init();
   runApp(const NoisyApp());
 }
@@ -95,6 +98,7 @@ class _MainShellState extends State<MainShell> {
   late final StorageService _storageService;
   late final MoodEngine _moodEngine;
   late final MotifEngine _motifEngine;
+  final LlmService _llmService = LlmService();
   late final List<Widget> _screens;
 
   // GlobalKey for LibraryScreen so we can call loadMixes() after a save.
@@ -120,6 +124,7 @@ class _MainShellState extends State<MainShell> {
         journeyEngine: _journeyEngine,
         moodEngine: _moodEngine,
         motifEngine: _motifEngine,
+        llmService: _llmService,
       ),
       MixerScreen(
         key: _mixerKey,

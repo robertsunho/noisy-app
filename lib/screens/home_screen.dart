@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/audio_engine.dart';
 import '../services/journey_engine.dart';
+import '../services/llm_service.dart';
 import '../services/mood_engine.dart';
 import '../services/motif_engine.dart';
 
@@ -13,6 +14,7 @@ class HomeScreen extends StatefulWidget {
   final JourneyEngine journeyEngine;
   final MoodEngine moodEngine;
   final MotifEngine motifEngine;
+  final LlmService llmService;
 
   const HomeScreen({
     super.key,
@@ -20,6 +22,7 @@ class HomeScreen extends StatefulWidget {
     required this.journeyEngine,
     required this.moodEngine,
     required this.motifEngine,
+    required this.llmService,
   });
 
   @override
@@ -32,6 +35,8 @@ class _HomeScreenState extends State<HomeScreen> {
   double _warmth = 0.5;
   double _durationMinutes = 30.0;
   bool _isGenerating = false;
+  bool _isParsing = false;
+  final _moodTextController = TextEditingController();
 
   @override
   void initState() {
@@ -42,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     widget.journeyEngine.removeListener(_onChanged);
+    _moodTextController.dispose();
     super.dispose();
   }
 
@@ -84,6 +90,37 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) setState(() => _isGenerating = false);
     } catch (_) {
       if (mounted) setState(() => _isGenerating = false);
+    }
+  }
+
+  Future<void> _submitMoodText() async {
+    final text = _moodTextController.text.trim();
+    if (text.isEmpty || _isParsing) return;
+
+    setState(() => _isParsing = true);
+    final result = await widget.llmService.parseMood(text);
+    if (!mounted) return;
+
+    if (result != null) {
+      setState(() {
+        _energy = result.energy.clamp(0.0, 1.0);
+        _focus = result.focus.clamp(0.0, 1.0);
+        _warmth = result.warmth.clamp(0.0, 1.0);
+        _isParsing = false;
+      });
+      _moodTextController.clear();
+      await _generate();
+    } else {
+      setState(() => _isParsing = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                "Couldn't process your request — try adjusting the sliders instead"),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -239,54 +276,52 @@ class _HomeScreenState extends State<HomeScreen> {
 
         const SizedBox(height: 16),
 
-        // ── Text input placeholder ─────────────────────────────────────────
-        GestureDetector(
-          onTap: () {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Natural language coming soon'),
-                behavior: SnackBarBehavior.floating,
-              ),
-            );
-          },
-          child: AbsorbPointer(
-            child: TextField(
-              enabled: false,
-              decoration: InputDecoration(
-                hintText: 'Or describe how you want to feel...',
-                hintStyle: TextStyle(
-                  color: onSurface.withValues(alpha: 0.3),
-                  fontSize: 14,
-                ),
-                filled: true,
-                fillColor: theme.colorScheme.surfaceContainerHighest,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide.none,
-                ),
-                prefixIcon: Icon(
-                  Icons.edit_note_rounded,
-                  color: onSurface.withValues(alpha: 0.3),
-                ),
-                suffixIcon: Container(
-                  margin: const EdgeInsets.all(8),
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: gold.withValues(alpha: 0.10),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    'Soon',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: gold.withValues(alpha: 0.7),
-                    ),
-                  ),
-                ),
+        // ── Natural language mood input ────────────────────────────────────
+        TextField(
+          controller: _moodTextController,
+          style: TextStyle(color: onSurface, fontSize: 14),
+          textInputAction: TextInputAction.send,
+          onSubmitted: (_) => _submitMoodText(),
+          decoration: InputDecoration(
+            hintText: 'Or tell us how you want to feel...',
+            hintStyle: TextStyle(
+              color: onSurface.withValues(alpha: 0.3),
+              fontSize: 14,
+            ),
+            filled: true,
+            fillColor: theme.colorScheme.surfaceContainerHighest,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: gold.withValues(alpha: 0.45),
+                width: 1,
               ),
             ),
+            prefixIcon: Icon(
+              Icons.edit_note_rounded,
+              color: onSurface.withValues(alpha: 0.35),
+            ),
+            suffixIcon: _isParsing
+                ? Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: gold,
+                      ),
+                    ),
+                  )
+                : IconButton(
+                    icon: Icon(Icons.arrow_forward_rounded, color: gold),
+                    onPressed: _submitMoodText,
+                    tooltip: 'Generate from description',
+                  ),
           ),
         ),
 

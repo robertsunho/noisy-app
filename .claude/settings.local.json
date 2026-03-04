@@ -13,7 +13,26 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(git filter-branch:*)",
-      "Bash(git reset:*)"
+      "Bash(git reset:*)",
+      "Bash(cd /c/Users/rober/noisy_app && flutter analyze lib/models/sound_meta.dart lib/screens/library_screen.dart lib/main.dart 2>&1\\\\)",
+      "Bash(cd /c/Users/rober/noisy_app && flutter analyze lib/services/audio_engine.dart lib/services/journey_engine.dart lib/screens/home_screen.dart lib/screens/mixer_screen.dart 2>&1)",
+      "Bash(cd /c/Users/rober/noisy_app && flutter analyze lib/screens/library_screen.dart 2>&1)",
+      "Bash(cd /c/Users/rober/noisy_app && flutter analyze 2>&1)",
+      "Bash(cd:*)",
+      "Bash(tail:*)",
+      "Bash(head:*)",
+      "Bash(cd /c/Users/rober/noisy_app && flutter analyze lib/ 2>&1)",
+      "WebFetch(domain:pub.dev)",
+      "WebFetch(domain:docs.page)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(cd /c/Users/rober/noisy_app && flutter pub get 2>&1)",
+      "Bash(cd /c/Users/rober/noisy_app && flutter analyze lib/services/mood_engine.dart 2>&1)",
+      "Bash(cd \"C:/Users/rober/noisy_app\" && flutter analyze 2>&1)",
+      "Bash(test:*)",
+      "Bash(flutter pub:*)",
+      "Bash(flutter analyze:*)"
     ]
   }
 }

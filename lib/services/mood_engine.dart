@@ -24,10 +24,12 @@ class MoodEngine {
 
   // ── Public API ────────────────────────────────────────────────────────────
 
-  /// Returns 2–4 sounds for the given mood:
-  ///   • exactly 1 frequency (skipped if best distance > 1.2)   → vol 0.40
-  ///   • exactly 1 binaural  (skipped if best distance > 1.2)   → vol 0.45
-  ///   • 2 nature/noise textures (always selected)              → vol 0.50 / 0.30
+  /// Returns 3–5 sounds for the given mood:
+  ///   • 1 soundscape  (always selected)                        → vol 0.55
+  ///   • 1 nature      (always selected)                        → vol 0.35
+  ///   • 1 noise color (always selected)                        → vol 0.30
+  ///   • 1 binaural    (skipped if best distance > 1.2)         → vol 0.35
+  ///   • 1 frequency   (skipped if best distance > 1.2)         → vol 0.30
   List<SoundRecommendation> generateMix(
       double energy, double focus, double warmth) {
     return _selectByCategory(energy, focus, warmth);
@@ -182,11 +184,12 @@ class MoodEngine {
     return 0.3 + energy * 0.2;                             // 0.30–0.50
   }
 
-  /// Builds the balanced mix with 4 category slots:
+  /// Builds the balanced mix with 5 category slots:
   ///   1. Best soundscape   → vol 0.55 (primary atmospheric layer)
-  ///   2. Best texture      → vol 0.40 (nature/noise complement)
-  ///   3. Best binaural     → vol 0.40 (skip if distance > 1.2)
-  ///   4. Best frequency    → vol 0.35 (skip if distance > 1.2)
+  ///   2. Best nature       → vol 0.35 (organic texture)
+  ///   3. Best noise color  → vol 0.30 (dedicated noise slot)
+  ///   4. Best binaural     → vol 0.35 (skip if distance > 1.2)
+  ///   5. Best frequency    → vol 0.30 (skip if distance > 1.2)
   List<SoundRecommendation> _selectByCategory(
       double energy, double focus, double warmth) {
     final all = kSoundCatalog
@@ -202,9 +205,8 @@ class MoodEngine {
         all.where((e) => e.$1.category == cat).toList();
 
     final soundscapes = ofCat('soundscape');
-    final textures = all
-        .where((e) => e.$1.category == 'nature' || e.$1.category == 'noise')
-        .toList();
+    final natures = ofCat('nature');
+    final noises = ofCat('noise');
     final binaurals = ofCat('binaural');
     final frequencies = ofCat('frequencies');
 
@@ -218,19 +220,27 @@ class MoodEngine {
           distance: soundscapes.first.$2));
     }
 
-    // Best texture (nature/noise)
-    if (textures.isNotEmpty) {
+    // Best nature sound
+    if (natures.isNotEmpty) {
       result.add(SoundRecommendation(
-          meta: textures.first.$1,
-          volume: 0.40,
-          distance: textures.first.$2));
+          meta: natures.first.$1,
+          volume: 0.35,
+          distance: natures.first.$2));
+    }
+
+    // Best noise color — dedicated slot so it is never crowded out by nature
+    if (noises.isNotEmpty) {
+      result.add(SoundRecommendation(
+          meta: noises.first.$1,
+          volume: 0.30,
+          distance: noises.first.$2));
     }
 
     // Best binaural — skip if too distant
     if (binaurals.isNotEmpty && binaurals.first.$2 <= _maxDist) {
       result.add(SoundRecommendation(
           meta: binaurals.first.$1,
-          volume: 0.40,
+          volume: 0.35,
           distance: binaurals.first.$2));
     }
 
@@ -238,7 +248,7 @@ class MoodEngine {
     if (frequencies.isNotEmpty && frequencies.first.$2 <= _maxDist) {
       result.add(SoundRecommendation(
           meta: frequencies.first.$1,
-          volume: 0.35,
+          volume: 0.30,
           distance: frequencies.first.$2));
     }
 
