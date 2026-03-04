@@ -117,63 +117,90 @@ class HarmonicMatcher {
     return pow(2.0, shift / 12.0).toDouble();
   }
 
-  /// Finds a binaural carrier frequency placed on a consonant scale degree of
-  /// [soundscapeRootHz] that avoids the degree occupied by [solfeggioHz],
-  /// then octave-transposes the result into the 100–250 Hz felt-bass range.
+  /// Scores how consonant [solfeggioHz] sits relative to [soundscapeRootHz].
   ///
-  /// Returns the carrier frequency in Hz and a human-readable degree name.
-  /// Degree selection priority: Perfect 5th → Perfect 4th → Major 3rd →
-  /// Tonic → Major 6th → Minor 3rd.
-  static ({double carrierHz, String degreeName}) findBinauralCarrier(
+  /// Computes the interval in semitones (octave-folded to 0–11), then maps:
+  ///   0  (unison / octave) → 1.0
+  ///   7  (perfect 5th)     → 0.9
+  ///   4  (major 3rd)       → 0.8
+  ///   3  (minor 3rd)       → 0.7
+  ///   all other intervals  → 0.3
+  static double harmonicCompatibility(
       double soundscapeRootHz, double solfeggioHz) {
-    const degrees = [0, 3, 4, 5, 7, 9];
-    const names = <int, String>{
-      0: 'Tonic',
-      3: 'Minor 3rd',
-      4: 'Major 3rd',
-      5: 'Perfect 4th',
-      7: 'Perfect 5th',
-      9: 'Major 6th',
-    };
-    const priority = [7, 5, 4, 0, 9, 3];
-
-    // Interval of solfeggio relative to root, folded into [0, 12).
     double raw = frequencyToMidi(solfeggioHz) - frequencyToMidi(soundscapeRootHz);
     raw = raw % 12.0;
     if (raw < 0) raw += 12.0;
-
-    // Round to nearest consonant degree (with wraparound at the octave).
-    int solDegree = degrees.reduce((a, b) =>
-        _circDist(raw, a.toDouble()) <= _circDist(raw, b.toDouble()) ? a : b);
-
-    // Exclude the solfeggio's degree so the carrier doesn't clash.
-    final candidates = degrees.where((d) => d != solDegree).toList();
-
-    // Pick highest-priority available candidate.
-    int chosen = candidates.first;
-    for (final p in priority) {
-      if (candidates.contains(p)) {
-        chosen = p;
-        break;
-      }
+    final degree = raw.round() % 12;
+    switch (degree) {
+      case 0: return 1.0;
+      case 7: return 0.9;
+      case 4: return 0.8;
+      case 3: return 0.7;
+      default: return 0.3;
     }
-
-    // Frequency of chosen degree from the soundscape root.
-    double hz = soundscapeRootHz * pow(2.0, chosen / 12.0);
-
-    // Octave-transpose into 100–250 Hz (felt-bass range).
-    var i = 0;
-    while (hz > 250.0 && i < 8) { hz /= 2.0; i++; }
-    i = 0;
-    while (hz < 100.0 && i < 8) { hz *= 2.0; i++; }
-    if (hz < 100.0 || hz > 250.0) hz = 150.0; // shouldn't happen
-
-    return (carrierHz: hz, degreeName: '${names[chosen]!} from root');
   }
 
-  // Circular distance between two values on a [0, 12) pitch-class circle.
-  static double _circDist(double a, double b) {
-    final d = (a - b).abs() % 12.0;
-    return d > 6.0 ? 12.0 - d : d;
+  /// Finds a binaural carrier frequency placed on a consonant scale degree of
+  /// [soundscapeRootHz] that forms a stable triad voicing with [solfeggioHz],
+  /// then octave-transposes the result into the 80–300 Hz felt-bass range.
+  ///
+  /// Degree selection:
+  ///   • solfeggio near root (±1 st)  → carrier = Perfect 5th (degree 7)
+  ///   • solfeggio near 5th  (±1 st)  → carrier = Root (degree 0)
+  ///   • otherwise                    → carrier = Root (degree 0)
+  ///
+  /// Among valid octave candidates (80–300 Hz), the one furthest in actual
+  /// (non-octave-folded) semitones from the solfeggio is preferred so the
+  /// carrier does not crowd the melodic layer.
+  static ({double carrierHz, String degreeName}) findBinauralCarrier(
+      double soundscapeRootHz, double solfeggioHz) {
+    // Solfeggio scale degree relative to root, folded into [0, 12).
+    double raw = frequencyToMidi(solfeggioHz) - frequencyToMidi(soundscapeRootHz);
+    raw = raw % 12.0;
+    if (raw < 0) raw += 12.0;
+    final solDegree = raw.round() % 12;
+
+    // Near root = degrees {11, 0, 1}; otherwise → carrier on root.
+    final bool nearRoot = solDegree <= 1 || solDegree >= 11;
+    final int chosenDegree = nearRoot ? 7 : 0;
+    final String degreeName = nearRoot ? 'Perfect 5th' : 'Root';
+
+    // Base carrier frequency from soundscape root at chosen degree.
+    final double baseHz = soundscapeRootHz * pow(2.0, chosenDegree / 12.0);
+
+    // Build all octave transpositions of baseHz starting from the [40, 80) band.
+    double hz = baseHz;
+    while (hz > 80) { hz /= 2; }
+    while (hz < 40) { hz *= 2; }
+    // hz is now in [40, 80)
+
+    final candidates = <double>[];
+    while (hz <= 600) {
+      candidates.add(hz);
+      hz *= 2;
+    }
+
+    final validCandidates = candidates.where((c) => c >= 80 && c <= 300).toList();
+
+    final double carrierHz;
+    if (validCandidates.isEmpty) {
+      // Fall back to octave closest to range midpoint 190 Hz.
+      carrierHz = candidates.isEmpty
+          ? 190.0
+          : candidates.reduce((a, b) =>
+              (a - 190.0).abs() < (b - 190.0).abs() ? a : b);
+    } else if (validCandidates.length == 1) {
+      carrierHz = validCandidates.first;
+    } else {
+      // Prefer the candidate furthest in actual semitones from solfeggio
+      // (non-octave-folded distance) to avoid crowding the melodic layer.
+      carrierHz = validCandidates.reduce((a, b) {
+        final distA = (frequencyToMidi(a) - frequencyToMidi(solfeggioHz)).abs();
+        final distB = (frequencyToMidi(b) - frequencyToMidi(solfeggioHz)).abs();
+        return distA >= distB ? a : b;
+      });
+    }
+
+    return (carrierHz: carrierHz, degreeName: degreeName);
   }
 }

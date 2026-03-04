@@ -185,13 +185,19 @@ class MoodEngine {
   }
 
   /// Builds the balanced mix with 5 category slots:
-  ///   1. Best soundscape   → vol 0.55 (primary atmospheric layer)
+  ///   1. Best soundscape   → vol 0.55 (combined mood + harmonic score)
   ///   2. Best nature       → vol 0.35 (organic texture)
   ///   3. Best noise color  → vol 0.30 (dedicated noise slot)
   ///   4. Best binaural     → vol 0.35 (skip if distance > 1.2)
   ///   5. Best frequency    → vol 0.30 (skip if distance > 1.2)
+  ///
+  /// Soundscape selection uses a combined score when a solfeggio frequency is
+  /// in the mix: 60% mood fit + 40% harmonic compatibility with the solfeggio.
+  /// The solfeggio is resolved first so it can inform the soundscape choice.
   List<SoundRecommendation> _selectByCategory(
       double energy, double focus, double warmth) {
+    const maxPossibleDist = 1.732; // sqrt(3) — max Euclidean distance in unit cube
+
     final all = kSoundCatalog
         .where((s) => s.isAvailable && kMoodProfiles.containsKey(s.id))
         .map((s) {
@@ -212,12 +218,30 @@ class MoodEngine {
 
     final result = <SoundRecommendation>[];
 
-    // Best soundscape — primary atmospheric layer
+    // Step 1: Resolve solfeggio frequency BEFORE selecting the soundscape so
+    // it can drive harmonic compatibility scoring.
+    final bestFreq = frequencies.isNotEmpty ? frequencies.first : null;
+    final double? solfeggioHz = (bestFreq != null && bestFreq.$2 <= _maxDist)
+        ? _parseFrequency(bestFreq.$1.id)
+        : null;
+
+    // Step 2: Soundscape — combined mood + harmonic score when solfeggio known.
     if (soundscapes.isNotEmpty) {
+      var best = soundscapes.first; // default: pure mood-distance winner
+      if (solfeggioHz != null) {
+        double computeScore((SoundMeta, double) e) {
+          final moodScore = 1.0 - (e.$2 / maxPossibleDist).clamp(0.0, 1.0);
+          final rootHz = e.$1.rootFrequency;
+          final harmonicScore = rootHz != null
+              ? HarmonicMatcher.harmonicCompatibility(rootHz, solfeggioHz)
+              : 0.3;
+          return moodScore * 0.6 + harmonicScore * 0.4;
+        }
+        best = soundscapes.reduce(
+            (a, b) => computeScore(b) > computeScore(a) ? b : a);
+      }
       result.add(SoundRecommendation(
-          meta: soundscapes.first.$1,
-          volume: 0.55,
-          distance: soundscapes.first.$2));
+          meta: best.$1, volume: 0.55, distance: best.$2));
     }
 
     // Best nature sound
@@ -245,11 +269,11 @@ class MoodEngine {
     }
 
     // Best frequency — skip if too distant
-    if (frequencies.isNotEmpty && frequencies.first.$2 <= _maxDist) {
+    if (bestFreq != null && bestFreq.$2 <= _maxDist) {
       result.add(SoundRecommendation(
-          meta: frequencies.first.$1,
+          meta: bestFreq.$1,
           volume: 0.30,
-          distance: frequencies.first.$2));
+          distance: bestFreq.$2));
     }
 
     return result;
