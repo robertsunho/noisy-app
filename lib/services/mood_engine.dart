@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter/material.dart';
 import '../models/journey.dart';
 import '../models/mood_profile.dart';
@@ -114,7 +115,7 @@ class MoodEngine {
     }
 
     final motifIds = _selectMotifPalette(category);
-    final motifDensity = _inferMotifDensity(energy, category);
+    final motifDensity = _inferMotifDensity(category);
     final wp2Density = category == 'Sleep' ? 0.1 : motifDensity;
 
     // Waypoint 0 — starting state
@@ -177,19 +178,23 @@ class MoodEngine {
         .toList();
   }
 
-  /// Maps energy + category to a motif trigger density [0, 1].
-  static double _inferMotifDensity(double energy, String category) {
-    if (category == 'Sleep') return 0.2 + energy * 0.1;    // 0.20–0.30
-    if (category == 'Energize') return 0.6 + energy * 0.2; // 0.60–0.80
-    return 0.3 + energy * 0.2;                             // 0.30–0.50
+  /// Returns the motif trigger density [0, 1] for [category] from Remote Config.
+  static double _inferMotifDensity(String category) {
+    final rc = FirebaseRemoteConfig.instance;
+    switch (category) {
+      case 'Sleep':    return rc.getDouble('motif_density_sleep');
+      case 'Energize': return rc.getDouble('motif_density_energize');
+      case 'Focus':    return rc.getDouble('motif_density_focus');
+      default:         return rc.getDouble('motif_density_relax');
+    }
   }
 
-  /// Builds the balanced mix with 5 category slots:
-  ///   1. Best soundscape   → vol 0.55 (combined mood + harmonic score)
-  ///   2. Best nature       → vol 0.35 (organic texture)
-  ///   3. Best noise color  → vol 0.30 (dedicated noise slot)
-  ///   4. Best binaural     → vol 0.35 (skip if distance > 1.2)
-  ///   5. Best frequency    → vol 0.30 (skip if distance > 1.2)
+  /// Builds the balanced mix with 5 category slots (volumes from Remote Config):
+  ///   1. Best soundscape   (combined mood + harmonic score)
+  ///   2. Best nature       (organic texture)
+  ///   3. Best noise color  (dedicated noise slot)
+  ///   4. Best binaural     (skip if distance > 1.2)
+  ///   5. Best frequency    (skip if distance > 1.2)
   ///
   /// Soundscape selection uses a combined score when a solfeggio frequency is
   /// in the mix: 60% mood fit + 40% harmonic compatibility with the solfeggio.
@@ -197,6 +202,7 @@ class MoodEngine {
   List<SoundRecommendation> _selectByCategory(
       double energy, double focus, double warmth) {
     const maxPossibleDist = 1.732; // sqrt(3) — max Euclidean distance in unit cube
+    final rc = FirebaseRemoteConfig.instance;
 
     final all = kSoundCatalog
         .where((s) => s.isAvailable && kMoodProfiles.containsKey(s.id))
@@ -241,14 +247,16 @@ class MoodEngine {
             (a, b) => computeScore(b) > computeScore(a) ? b : a);
       }
       result.add(SoundRecommendation(
-          meta: best.$1, volume: 0.55, distance: best.$2));
+          meta: best.$1,
+          volume: rc.getDouble('soundscape_volume'),
+          distance: best.$2));
     }
 
     // Best nature sound
     if (natures.isNotEmpty) {
       result.add(SoundRecommendation(
           meta: natures.first.$1,
-          volume: 0.35,
+          volume: rc.getDouble('nature_volume'),
           distance: natures.first.$2));
     }
 
@@ -256,7 +264,7 @@ class MoodEngine {
     if (noises.isNotEmpty) {
       result.add(SoundRecommendation(
           meta: noises.first.$1,
-          volume: 0.30,
+          volume: rc.getDouble('noise_volume'),
           distance: noises.first.$2));
     }
 
@@ -264,7 +272,7 @@ class MoodEngine {
     if (binaurals.isNotEmpty && binaurals.first.$2 <= _maxDist) {
       result.add(SoundRecommendation(
           meta: binaurals.first.$1,
-          volume: 0.35,
+          volume: rc.getDouble('binaural_volume'),
           distance: binaurals.first.$2));
     }
 
@@ -272,7 +280,7 @@ class MoodEngine {
     if (bestFreq != null && bestFreq.$2 <= _maxDist) {
       result.add(SoundRecommendation(
           meta: bestFreq.$1,
-          volume: 0.30,
+          volume: rc.getDouble('frequency_volume'),
           distance: bestFreq.$2));
     }
 
