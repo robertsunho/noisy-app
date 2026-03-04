@@ -78,6 +78,7 @@ class MixerScreen extends StatefulWidget {
 
 class MixerScreenState extends State<MixerScreen> {
   final Set<String> _loading = {};
+  bool _engineChangePending = false;
 
   AudioEngine get _engine => widget.engine;
 
@@ -88,7 +89,12 @@ class MixerScreenState extends State<MixerScreen> {
   }
 
   void _onEngineChanged() {
-    if (mounted) setState(() {});
+    if (!mounted || _engineChangePending) return;
+    _engineChangePending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _engineChangePending = false;
+      if (mounted) setState(() {});
+    });
   }
 
   @override

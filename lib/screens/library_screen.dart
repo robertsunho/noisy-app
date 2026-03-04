@@ -83,10 +83,12 @@ class LibraryScreenState extends State<LibraryScreen> {
     final existing =
         widget.engine.layers.map((l) => l.assetPath).toList();
     await Future.wait(existing.map(widget.engine.removeLayer));
+    if (!mounted) return;
 
     for (final layer in mix.layers) {
       if (widget.engine.isFull) break;
       await widget.engine.addLayer(layer.assetPath, layer.name);
+      if (!mounted) return;
     }
 
     for (final layer in mix.layers) {
@@ -578,6 +580,7 @@ class _SoundsScreenState extends State<_SoundsScreen> {
   String? _previewingPath;
   bool _previewLoading = false;
   StreamSubscription<ProcessingState>? _previewSub;
+  bool _engineChangePending = false;
 
   @override
   void initState() {
@@ -593,7 +596,12 @@ class _SoundsScreenState extends State<_SoundsScreen> {
   }
 
   void _onEngineChanged() {
-    if (mounted) setState(() {});
+    if (!mounted || _engineChangePending) return;
+    _engineChangePending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _engineChangePending = false;
+      if (mounted) setState(() {});
+    });
   }
 
   void _cleanupPreview() {

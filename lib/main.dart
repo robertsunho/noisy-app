@@ -129,6 +129,9 @@ class _MainShellState extends State<MainShell> {
   final LlmService _llmService = LlmService();
   late final List<Widget> _screens;
 
+  // Guards against re-entrant / mid-frame setState from engine notifications.
+  bool _engineChangePending = false;
+
   // GlobalKey for LibraryScreen so we can call loadMixes() after a save.
   final _libraryKey = GlobalKey<LibraryScreenState>();
   final _mixerKey = GlobalKey<MixerScreenState>();
@@ -179,7 +182,14 @@ class _MainShellState extends State<MainShell> {
 
   void _onEngineChanged() {
     // Rebuild so the app bar save button reflects current layer count.
-    if (mounted) setState(() {});
+    // Debounced via addPostFrameCallback to avoid mid-frame setState from
+    // the engine's 50ms Timer ticks.
+    if (!mounted || _engineChangePending) return;
+    _engineChangePending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _engineChangePending = false;
+      if (mounted) setState(() {});
+    });
   }
 
   @override
