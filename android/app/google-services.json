@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "905554908150",
+    "project_id": "noisy-app-93551",
+    "storage_bucket": "noisy-app-93551.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:905554908150:android:eb37436b180c2e7a56add7",
+        "android_client_info": {
+          "package_name": "com.example.noisy_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCOpeu1-_F5YY0r2CrNP1fRnVPo1cNcgAA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

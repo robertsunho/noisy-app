@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/saved_mix.dart';
+import '../services/analytics_service.dart';
 import '../services/audio_engine.dart';
 import '../services/journey_engine.dart';
 import '../services/storage_service.dart';
@@ -59,6 +60,7 @@ class MixerScreen extends StatefulWidget {
   final AudioEngine engine;
   final JourneyEngine journeyEngine;
   final StorageService storage;
+  final AnalyticsService analyticsService;
   final VoidCallback? onMixSaved;
 
   const MixerScreen({
@@ -66,6 +68,7 @@ class MixerScreen extends StatefulWidget {
     required this.engine,
     required this.journeyEngine,
     required this.storage,
+    required this.analyticsService,
     this.onMixSaved,
   });
 
@@ -104,10 +107,15 @@ class MixerScreenState extends State<MixerScreen> {
   /// the layer. Using abandon() instead of stop() means remaining layers
   /// keep playing at their current volumes.
   Future<void> _removeLayer(String assetPath) async {
+    final layerName = _engine.layers
+        .where((l) => l.assetPath == assetPath)
+        .map((l) => l.name)
+        .firstOrNull ?? assetPath;
     if (widget.journeyEngine.state != JourneyState.stopped) {
       widget.journeyEngine.abandon();
     }
     await _engine.removeLayer(assetPath);
+    widget.analyticsService.logLayerRemove(layerName: layerName);
   }
 
   // ── Sound tap ─────────────────────────────────────────────────────────────
@@ -125,6 +133,10 @@ class MixerScreenState extends State<MixerScreen> {
     setState(() => _loading.add(sound.assetPath));
     try {
       await _engine.addLayer(sound.assetPath, sound.name);
+      widget.analyticsService.logLayerAdd(
+        layerName: sound.name,
+        category: sound.category,
+      );
     } catch (e) {
       debugPrint('AudioEngine.addLayer error: $e');
     } finally {
@@ -247,6 +259,7 @@ class MixerScreenState extends State<MixerScreen> {
                           createdAt: DateTime.now(),
                         );
                         await widget.storage.save(mix);
+                        widget.analyticsService.logMixSave(mixName: mix.name);
                         widget.onMixSaved?.call();
                         if (ctx.mounted) Navigator.pop(ctx);
                       }

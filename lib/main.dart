@@ -1,11 +1,16 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_soloud/flutter_soloud.dart';
+import 'firebase_options.dart';
 import 'screens/home_screen.dart';
 import 'screens/journey_screen.dart';
 import 'screens/library_screen.dart';
 import 'screens/mixer_screen.dart';
 import 'screens/tone_test_screen.dart';
+import 'services/analytics_service.dart';
 import 'services/audio_engine.dart';
 import 'services/journey_engine.dart';
 import 'services/llm_service.dart';
@@ -16,6 +21,28 @@ import 'services/tone_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+
+  final remoteConfig = FirebaseRemoteConfig.instance;
+  await remoteConfig.setConfigSettings(RemoteConfigSettings(
+    fetchTimeout: const Duration(minutes: 1),
+    minimumFetchInterval: const Duration(hours: 1),
+  ));
+  await remoteConfig.setDefaults({
+    'motif_density_sleep': 0.25,
+    'motif_density_relax': 0.40,
+    'motif_density_focus': 0.40,
+    'motif_density_energize': 0.70,
+    'soundscape_volume': 0.55,
+    'nature_volume': 0.35,
+    'noise_volume': 0.30,
+    'binaural_volume': 0.35,
+    'frequency_volume': 0.30,
+  });
+  await remoteConfig.fetchAndActivate();
+
   await dotenv.load();
   await SoLoud.instance.init();
   runApp(const NoisyApp());
@@ -98,6 +125,7 @@ class _MainShellState extends State<MainShell> {
   late final StorageService _storageService;
   late final MoodEngine _moodEngine;
   late final MotifEngine _motifEngine;
+  late final AnalyticsService _analyticsService;
   final LlmService _llmService = LlmService();
   late final List<Widget> _screens;
 
@@ -117,6 +145,7 @@ class _MainShellState extends State<MainShell> {
     _storageService = StorageService();
     _moodEngine = MoodEngine();
     _motifEngine = MotifEngine();
+    _analyticsService = AnalyticsService();
 
     _screens = [
       HomeScreen(
@@ -125,12 +154,14 @@ class _MainShellState extends State<MainShell> {
         moodEngine: _moodEngine,
         motifEngine: _motifEngine,
         llmService: _llmService,
+        analyticsService: _analyticsService,
       ),
       MixerScreen(
         key: _mixerKey,
         engine: _audioEngine,
         journeyEngine: _journeyEngine,
         storage: _storageService,
+        analyticsService: _analyticsService,
         // After a mix is saved from the Mixer, refresh the Library list.
         onMixSaved: () => _libraryKey.currentState?.loadMixes(),
       ),

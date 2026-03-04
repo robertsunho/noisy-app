@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../services/analytics_service.dart';
 import '../services/audio_engine.dart';
 import '../services/journey_engine.dart';
 import '../services/llm_service.dart';
@@ -15,6 +16,7 @@ class HomeScreen extends StatefulWidget {
   final MoodEngine moodEngine;
   final MotifEngine motifEngine;
   final LlmService llmService;
+  final AnalyticsService analyticsService;
 
   const HomeScreen({
     super.key,
@@ -23,6 +25,7 @@ class HomeScreen extends StatefulWidget {
     required this.moodEngine,
     required this.motifEngine,
     required this.llmService,
+    required this.analyticsService,
   });
 
   @override
@@ -88,6 +91,12 @@ class _HomeScreenState extends State<HomeScreen> {
       );
 
       if (mounted) setState(() => _isGenerating = false);
+      widget.analyticsService.logGenerate(
+        energy: _energy,
+        focus: _focus,
+        warmth: _warmth,
+        category: journey.category,
+      );
     } catch (_) {
       if (mounted) setState(() => _isGenerating = false);
     }
@@ -110,6 +119,12 @@ class _HomeScreenState extends State<HomeScreen> {
       });
       _moodTextController.clear();
       await _generate();
+      widget.analyticsService.logLlmGenerate(
+        userText: text,
+        energy: _energy,
+        focus: _focus,
+        warmth: _warmth,
+      );
     } else {
       setState(() => _isParsing = false);
       if (mounted) {
