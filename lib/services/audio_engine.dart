@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'tone_service.dart';
@@ -295,9 +296,13 @@ class AudioEngine extends ChangeNotifier {
     if (layer._xPlayer == null) {
       layer._player!.setVolume(v);
     } else {
+      // Equal-power crossfade: cos/sin curves keep perceived loudness constant.
+      // Linear (1-t)/t fades dip ~3 dB at the midpoint; sin²+cos²=1 avoids this.
       final t = layer._xfadeT;
-      layer._player!.setVolume((v * (1.0 - t)).clamp(0.0, 1.0));
-      layer._xPlayer!.setVolume((v * t).clamp(0.0, 1.0));
+      final cosT = cos(t * pi / 2.0);
+      final sinT = sin(t * pi / 2.0);
+      layer._player!.setVolume((v * cosT).clamp(0.0, 1.0));
+      layer._xPlayer!.setVolume((v * sinT).clamp(0.0, 1.0));
     }
   }
 

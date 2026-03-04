@@ -153,7 +153,7 @@ class HarmonicMatcher {
   /// (non-octave-folded) semitones from the solfeggio is preferred so the
   /// carrier does not crowd the melodic layer.
   static ({double carrierHz, String degreeName}) findBinauralCarrier(
-      double soundscapeRootHz, double solfeggioHz) {
+      double soundscapeRootHz, double solfeggioHz, {double? beatFrequencyHz}) {
     // Solfeggio scale degree relative to root, folded into [0, 12).
     double raw = frequencyToMidi(solfeggioHz) - frequencyToMidi(soundscapeRootHz);
     raw = raw % 12.0;
@@ -180,15 +180,23 @@ class HarmonicMatcher {
       hz *= 2;
     }
 
-    final validCandidates = candidates.where((c) => c >= 80 && c <= 300).toList();
+    // Beta/gamma beats (≥15 Hz) sound better with a higher carrier (200-400 Hz)
+    // because a 20-40 Hz beat is a smaller musical interval at higher frequencies,
+    // producing a more natural beating tone rather than two distinct pitches.
+    final bool highBeat = beatFrequencyHz != null && beatFrequencyHz >= 15.0;
+    final double rangeMin = highBeat ? 200.0 : 80.0;
+    final double rangeMax = highBeat ? 400.0 : 300.0;
+    final double fallbackMid = highBeat ? 300.0 : 190.0;
+
+    final validCandidates = candidates.where((c) => c >= rangeMin && c <= rangeMax).toList();
 
     final double carrierHz;
     if (validCandidates.isEmpty) {
-      // Fall back to octave closest to range midpoint 190 Hz.
+      // Fall back to octave closest to range midpoint.
       carrierHz = candidates.isEmpty
-          ? 190.0
+          ? fallbackMid
           : candidates.reduce((a, b) =>
-              (a - 190.0).abs() < (b - 190.0).abs() ? a : b);
+              (a - fallbackMid).abs() < (b - fallbackMid).abs() ? a : b);
     } else if (validCandidates.length == 1) {
       carrierHz = validCandidates.first;
     } else {
