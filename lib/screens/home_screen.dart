@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/audio_engine.dart';
 import '../services/journey_engine.dart';
 import '../services/mood_engine.dart';
+import '../services/motif_engine.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Home screen — "How do you want to feel?"
@@ -11,12 +12,14 @@ class HomeScreen extends StatefulWidget {
   final AudioEngine audioEngine;
   final JourneyEngine journeyEngine;
   final MoodEngine moodEngine;
+  final MotifEngine motifEngine;
 
   const HomeScreen({
     super.key,
     required this.audioEngine,
     required this.journeyEngine,
     required this.moodEngine,
+    required this.motifEngine,
   });
 
   @override
@@ -53,28 +56,35 @@ class _HomeScreenState extends State<HomeScreen> {
     if (_isGenerating) return;
     setState(() => _isGenerating = true);
 
-    // Release journey control without fading (we're replacing everything).
-    if (widget.journeyEngine.state != JourneyState.stopped) {
-      widget.journeyEngine.abandon();
+    try {
+      // Release journey control without fading (we're replacing everything).
+      if (widget.journeyEngine.state != JourneyState.stopped) {
+        widget.journeyEngine.abandon();
+      }
+
+      // Fade out and remove all existing layers before loading the new mix.
+      final existing =
+          widget.audioEngine.layers.map((l) => l.assetPath).toList();
+      await Future.wait(existing.map(widget.audioEngine.removeLayer));
+
+      final journey = widget.moodEngine.generateJourney(
+        _energy,
+        _focus,
+        _warmth,
+        Duration(minutes: _durationMinutes.round()),
+      );
+
+      await widget.journeyEngine.start(
+        journey,
+        widget.audioEngine,
+        Duration(minutes: _durationMinutes.round()),
+        motifEngine: widget.motifEngine,
+      );
+
+      if (mounted) setState(() => _isGenerating = false);
+    } catch (_) {
+      if (mounted) setState(() => _isGenerating = false);
     }
-
-    // Fade out and remove all existing layers before loading the new mix.
-    final existing =
-        widget.audioEngine.layers.map((l) => l.assetPath).toList();
-    await Future.wait(existing.map(widget.audioEngine.removeLayer));
-
-    final journey = widget.moodEngine.generateJourney(
-      _energy,
-      _focus,
-      _warmth,
-      Duration(minutes: _durationMinutes.round()),
-    );
-    await widget.journeyEngine.start(
-      journey,
-      widget.audioEngine,
-      Duration(minutes: _durationMinutes.round()),
-    );
-    if (mounted) setState(() => _isGenerating = false);
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────

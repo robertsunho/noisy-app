@@ -44,12 +44,18 @@ class _ToneTestScreenState extends State<ToneTestScreen> {
   String _selectedRootKey = 'C';
   int _selectedSolfeggio = 528;
   HarmonicMatch? _matchResult;
+  double? _carrierHz;
+  String? _carrierDegreeName;
 
   void _calculateHarmonicMatch() {
     final rootHz = _rootKeys[_selectedRootKey]!;
+    final carrier = HarmonicMatcher.findBinauralCarrier(
+        rootHz, _selectedSolfeggio.toDouble());
     setState(() {
       _matchResult = HarmonicMatcher.findBestMatch(
           rootHz, _selectedSolfeggio.toDouble());
+      _carrierHz = carrier.carrierHz;
+      _carrierDegreeName = carrier.degreeName;
     });
   }
 
@@ -307,6 +313,8 @@ class _ToneTestScreenState extends State<ToneTestScreen> {
                   onTap: () => setState(() {
                     _selectedRootKey = key;
                     _matchResult = null;
+                    _carrierHz = null;
+                    _carrierDegreeName = null;
                   }),
                   gold: gold,
                 )).toList(),
@@ -330,6 +338,8 @@ class _ToneTestScreenState extends State<ToneTestScreen> {
                   onTap: () => setState(() {
                     _selectedSolfeggio = hz;
                     _matchResult = null;
+                    _carrierHz = null;
+                    _carrierDegreeName = null;
                   }),
                   gold: gold,
                 )).toList(),
@@ -384,6 +394,19 @@ class _ToneTestScreenState extends State<ToneTestScreen> {
                           label: 'New root',
                           value: '${m.resultingRootHz.toStringAsFixed(1)} Hz',
                           gold: gold),
+                      if (_carrierHz != null) ...[
+                        Divider(
+                            height: 16,
+                            color: gold.withValues(alpha: 0.2)),
+                        _ResultRow(
+                            label: 'Binaural carrier',
+                            value: '${_carrierHz!.toStringAsFixed(1)} Hz',
+                            gold: gold),
+                        _ResultRow(
+                            label: 'Carrier degree',
+                            value: _carrierDegreeName!,
+                            gold: gold),
+                      ],
                     ],
                   ),
                 ),

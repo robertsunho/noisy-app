@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../models/journey.dart';
+import '../models/motif_meta.dart';
 import 'audio_engine.dart';
+import 'motif_engine.dart';
 
 enum JourneyState { stopped, playing, frozen }
 
@@ -14,6 +16,7 @@ class JourneyEngine extends ChangeNotifier {
 
   Journey? _journey;
   AudioEngine? _engine;
+  MotifEngine? _motifEngine;
   JourneyState _state = JourneyState.stopped;
   Duration _totalDuration = const Duration(minutes: 30);
 
@@ -45,12 +48,14 @@ class JourneyEngine extends ChangeNotifier {
   Future<void> start(
     Journey journey,
     AudioEngine engine,
-    Duration totalDuration,
-  ) async {
+    Duration totalDuration, {
+    MotifEngine? motifEngine,
+  }) async {
     if (_state != JourneyState.stopped) await stop();
 
     _journey = journey;
     _engine = engine;
+    _motifEngine = motifEngine;
     _totalDuration = totalDuration;
     _stopwatch.reset();
     _state = JourneyState.playing;
@@ -94,6 +99,7 @@ class JourneyEngine extends ChangeNotifier {
     _state = JourneyState.stopped;
     _journey = null;
     _engine = null;
+    _motifEngine = null;
     notifyListeners();
   }
 
@@ -113,6 +119,9 @@ class JourneyEngine extends ChangeNotifier {
       final paths = engine.layers.map((l) => l.assetPath).toList();
       await Future.wait(paths.map(engine.removeLayer));
     }
+
+    await _motifEngine?.stop();
+    _motifEngine = null;
 
     notifyListeners();
   }
@@ -173,9 +182,34 @@ class JourneyEngine extends ChangeNotifier {
             volume: 0.0,
           );
         }
+      } else if (src is MotifSource) {
+        if (_motifEngine == null || _motifEngine!.isRunning) continue;
+        // Resolve IDs to catalog entries.
+        final palette = src.motifIds
+            .map(_findMotifById)
+            .whereType<MotifMeta>()
+            .toList();
+        // Align motifs to any solfeggio tone in this waypoint.
+        final toneFreq = waypoint.layers
+            .whereType<ToneSource>()
+            .map((t) => t.frequency)
+            .firstOrNull;
+        await _motifEngine!.start(
+          palette,
+          density: src.density,
+          masterVolume: src.volume,
+          targetFrequency: toneFreq,
+        );
       }
       // Volume intentionally left at 0; _applyInterpolation handles the ramp.
     }
+  }
+
+  MotifMeta? _findMotifById(String id) {
+    for (final m in kMotifCatalog) {
+      if (m.id == id) return m;
+    }
+    return null;
   }
 
   // ── Interpolation ────────────────────────────
@@ -387,6 +421,18 @@ class JourneyEngine extends ChangeNotifier {
         _engine!.setVolume(id, (rawVol * rampFactor).clamp(0.0, 1.0));
         _engine!.setBinauralFrequencies(id, center, beat);
       }
+    }
+
+    // ── Motif density/volume interpolation ───────────────────────────────
+    final fromMotif = fromWp.layers.whereType<MotifSource>().firstOrNull;
+    final toMotif = toWp.layers.whereType<MotifSource>().firstOrNull;
+    if (_motifEngine != null && (fromMotif != null || toMotif != null)) {
+      final d1 = fromMotif?.density ?? 0.0;
+      final d2 = toMotif?.density ?? 0.0;
+      final v1 = fromMotif?.volume ?? 0.0;
+      final v2 = toMotif?.volume ?? 0.0;
+      _motifEngine!.setDensity(_lerp(d1, d2, easedT));
+      _motifEngine!.setMasterVolume(_lerp(v1, v2, easedT));
     }
   }
 

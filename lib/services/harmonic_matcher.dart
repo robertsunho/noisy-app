@@ -116,4 +116,64 @@ class HarmonicMatcher {
     final shift = semitonesBetween(soundscapeRootHz, targetHz);
     return pow(2.0, shift / 12.0).toDouble();
   }
+
+  /// Finds a binaural carrier frequency placed on a consonant scale degree of
+  /// [soundscapeRootHz] that avoids the degree occupied by [solfeggioHz],
+  /// then octave-transposes the result into the 100–250 Hz felt-bass range.
+  ///
+  /// Returns the carrier frequency in Hz and a human-readable degree name.
+  /// Degree selection priority: Perfect 5th → Perfect 4th → Major 3rd →
+  /// Tonic → Major 6th → Minor 3rd.
+  static ({double carrierHz, String degreeName}) findBinauralCarrier(
+      double soundscapeRootHz, double solfeggioHz) {
+    const degrees = [0, 3, 4, 5, 7, 9];
+    const names = <int, String>{
+      0: 'Tonic',
+      3: 'Minor 3rd',
+      4: 'Major 3rd',
+      5: 'Perfect 4th',
+      7: 'Perfect 5th',
+      9: 'Major 6th',
+    };
+    const priority = [7, 5, 4, 0, 9, 3];
+
+    // Interval of solfeggio relative to root, folded into [0, 12).
+    double raw = frequencyToMidi(solfeggioHz) - frequencyToMidi(soundscapeRootHz);
+    raw = raw % 12.0;
+    if (raw < 0) raw += 12.0;
+
+    // Round to nearest consonant degree (with wraparound at the octave).
+    int solDegree = degrees.reduce((a, b) =>
+        _circDist(raw, a.toDouble()) <= _circDist(raw, b.toDouble()) ? a : b);
+
+    // Exclude the solfeggio's degree so the carrier doesn't clash.
+    final candidates = degrees.where((d) => d != solDegree).toList();
+
+    // Pick highest-priority available candidate.
+    int chosen = candidates.first;
+    for (final p in priority) {
+      if (candidates.contains(p)) {
+        chosen = p;
+        break;
+      }
+    }
+
+    // Frequency of chosen degree from the soundscape root.
+    double hz = soundscapeRootHz * pow(2.0, chosen / 12.0);
+
+    // Octave-transpose into 100–250 Hz (felt-bass range).
+    var i = 0;
+    while (hz > 250.0 && i < 8) { hz /= 2.0; i++; }
+    i = 0;
+    while (hz < 100.0 && i < 8) { hz *= 2.0; i++; }
+    if (hz < 100.0 || hz > 250.0) hz = 150.0; // shouldn't happen
+
+    return (carrierHz: hz, degreeName: '${names[chosen]!} from root');
+  }
+
+  // Circular distance between two values on a [0, 12) pitch-class circle.
+  static double _circDist(double a, double b) {
+    final d = (a - b).abs() % 12.0;
+    return d > 6.0 ? 12.0 - d : d;
+  }
 }

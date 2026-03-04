@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import '../services/audio_engine.dart';
+import '../services/motif_engine.dart';
 
 // ─────────────────────────────────────────────
 // Sound source hierarchy
 // ─────────────────────────────────────────────
 
-enum SoundSourceType { sample, tone, binaural, soundscape }
+enum SoundSourceType { sample, tone, binaural, soundscape, motif }
 
 abstract class SoundSource {
   final double volume;
@@ -61,6 +62,22 @@ class BinauralSource extends SoundSource {
     required this.beatFrequency,
     required super.volume,
   }) : super(type: SoundSourceType.binaural);
+}
+
+/// A motif layer managed externally by [MotifEngine].
+///
+/// [motifIds] selects which catalog entries fire.
+/// [density] is the per-cycle trigger probability [0, 1].
+/// [volume] is the master volume passed to MotifEngine.
+class MotifSource extends SoundSource {
+  final List<String> motifIds;
+  final double density;
+
+  const MotifSource({
+    required this.motifIds,
+    required this.density,
+    required super.volume,
+  }) : super(type: SoundSourceType.motif);
 }
 
 // ─────────────────────────────────────────────
@@ -155,7 +172,11 @@ class Journey {
 
   /// Creates a two-waypoint journey that fades the engine's current mix to
   /// silence over [duration]. Snapshots layer volumes at call time.
-  factory Journey.sleepTimer(AudioEngine engine, Duration duration) {
+  factory Journey.sleepTimer(
+    AudioEngine engine,
+    Duration duration, {
+    MotifEngine? motifEngine,
+  }) {
     // Reconstructs the correct SoundSource subtype for each active layer.
     SoundSource toSource(AudioLayer l, double vol) {
       if (l.isTone && l.binBeatFreq != null) {
@@ -171,11 +192,27 @@ class Journey {
       return SampleSource(assetPath: l.assetPath, volume: vol);
     }
 
-    // Snapshot of current mix at current volumes.
-    final fromLayers = engine.layers.map((l) => toSource(l, l.volume)).toList();
+    // Snapshot of current mix at current volumes (+ optional motif layer).
+    final fromLayers = [
+      ...engine.layers.map((l) => toSource(l, l.volume)),
+      if (motifEngine?.isRunning == true)
+        MotifSource(
+          motifIds: motifEngine!.activeMotifIds,
+          density: motifEngine.density,
+          volume: 0.3,
+        ),
+    ];
 
     // Same layers, all at 0.0 — the interpolation target.
-    final toLayers = engine.layers.map((l) => toSource(l, 0.0)).toList();
+    final toLayers = [
+      ...engine.layers.map((l) => toSource(l, 0.0)),
+      if (motifEngine?.isRunning == true)
+        MotifSource(
+          motifIds: motifEngine!.activeMotifIds,
+          density: 0.0, // fade out completely
+          volume: 0.3,
+        ),
+    ];
 
     return Journey(
       id: 'sleep_timer',

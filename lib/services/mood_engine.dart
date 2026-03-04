@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import '../models/journey.dart';
 import '../models/mood_profile.dart';
+import '../models/motif_meta.dart';
 import '../models/sound_meta.dart';
 import 'harmonic_matcher.dart';
 
@@ -57,11 +58,18 @@ class MoodEngine {
     final recs = generateMix(energy, focus, warmth);
     final category = _inferCategory(energy, focus, warmth);
 
-    // If the mix contains a solfeggio tone, use its frequency as the binaural
-    // carrier so both oscillators share the same fundamental pitch.
+    // Solfeggio tone frequency (if present in the mix).
     final solfeggioFreq = recs
         .where((r) => r.meta.category == 'frequencies')
         .map((r) => _parseFrequency(r.meta.id))
+        .where((f) => f != null)
+        .cast<double>()
+        .firstOrNull;
+
+    // Soundscape root frequency (if present — used for key-aware binaural carrier).
+    final soundscapeRootHz = recs
+        .where((r) => r.meta.category == 'soundscape')
+        .map((r) => r.meta.rootFrequency)
         .where((f) => f != null)
         .cast<double>()
         .firstOrNull;
@@ -85,8 +93,13 @@ class MoodEngine {
       if (r.meta.category == 'binaural') {
         final p = _binauralParams[r.meta.id];
         if (p != null) {
+          final carrierHz = (soundscapeRootHz != null && solfeggioFreq != null)
+              ? HarmonicMatcher.findBinauralCarrier(
+                      soundscapeRootHz, solfeggioFreq)
+                  .carrierHz
+              : p.$1;
           return BinauralSource(
-              centerFrequency: solfeggioFreq ?? p.$1,
+              centerFrequency: carrierHz,
               beatFrequency: p.$2,
               volume: vol);
         }
@@ -98,9 +111,17 @@ class MoodEngine {
       return SampleSource(assetPath: r.meta.assetPath, volume: vol);
     }
 
+    final motifIds = _selectMotifPalette(category);
+    final motifDensity = _inferMotifDensity(energy, category);
+    final wp2Density = category == 'Sleep' ? 0.1 : motifDensity;
+
     // Waypoint 0 — starting state
     final wp0 = JourneyWaypoint(
-      layers: [for (final r in recs) toSource(r, r.volume)],
+      layers: [
+        for (final r in recs) toSource(r, r.volume),
+        if (motifIds.isNotEmpty)
+          MotifSource(motifIds: motifIds, density: motifDensity, volume: 0.3),
+      ],
     );
 
     // Waypoint 1 — slight mid-journey variation (alternating layers ±0.05)
@@ -110,15 +131,21 @@ class MoodEngine {
           toSource(
             recs[i],
             (recs[i].volume + (i.isEven ? 0.05 : -0.05)).clamp(0.10, 0.70),
-          )
+          ),
+        if (motifIds.isNotEmpty)
+          MotifSource(motifIds: motifIds, density: motifDensity, volume: 0.3),
       ],
       weight: 1.0,
       curve: EaseCurve.easeInOut,
     );
 
-    // Waypoint 2 — settle back to original volumes
+    // Waypoint 2 — settle back to original volumes (density reduced for sleep)
     final wp2 = JourneyWaypoint(
-      layers: [for (final r in recs) toSource(r, r.volume)],
+      layers: [
+        for (final r in recs) toSource(r, r.volume),
+        if (motifIds.isNotEmpty)
+          MotifSource(motifIds: motifIds, density: wp2Density, volume: 0.3),
+      ],
       weight: 1.0,
       curve: EaseCurve.easeInOut,
     );
@@ -137,6 +164,23 @@ class MoodEngine {
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
+
+  /// Selects up to 5 motifs whose tags match the journey category.
+  static List<String> _selectMotifPalette(String category) {
+    final tag = category.toLowerCase();
+    return kMotifCatalog
+        .where((m) => m.tags.contains(tag))
+        .take(5)
+        .map((m) => m.id)
+        .toList();
+  }
+
+  /// Maps energy + category to a motif trigger density [0, 1].
+  static double _inferMotifDensity(double energy, String category) {
+    if (category == 'Sleep') return 0.2 + energy * 0.1;    // 0.20–0.30
+    if (category == 'Energize') return 0.6 + energy * 0.2; // 0.60–0.80
+    return 0.3 + energy * 0.2;                             // 0.30–0.50
+  }
 
   /// Builds the balanced mix with 4 category slots:
   ///   1. Best soundscape   → vol 0.55 (primary atmospheric layer)

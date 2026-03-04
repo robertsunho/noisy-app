@@ -8,6 +8,7 @@ import 'screens/tone_test_screen.dart';
 import 'services/audio_engine.dart';
 import 'services/journey_engine.dart';
 import 'services/mood_engine.dart';
+import 'services/motif_engine.dart';
 import 'services/storage_service.dart';
 import 'services/tone_service.dart';
 
@@ -93,6 +94,7 @@ class _MainShellState extends State<MainShell> {
   late final JourneyEngine _journeyEngine;
   late final StorageService _storageService;
   late final MoodEngine _moodEngine;
+  late final MotifEngine _motifEngine;
   late final List<Widget> _screens;
 
   // GlobalKey for LibraryScreen so we can call loadMixes() after a save.
@@ -110,12 +112,14 @@ class _MainShellState extends State<MainShell> {
     _journeyEngine = JourneyEngine();
     _storageService = StorageService();
     _moodEngine = MoodEngine();
+    _motifEngine = MotifEngine();
 
     _screens = [
       HomeScreen(
         audioEngine: _audioEngine,
         journeyEngine: _journeyEngine,
         moodEngine: _moodEngine,
+        motifEngine: _motifEngine,
       ),
       MixerScreen(
         key: _mixerKey,
@@ -147,6 +151,7 @@ class _MainShellState extends State<MainShell> {
     _audioEngine.removeListener(_onEngineChanged);
     _audioEngine.dispose();
     _journeyEngine.dispose();
+    _motifEngine.dispose();
     super.dispose();
   }
 
