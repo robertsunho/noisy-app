@@ -42,6 +42,11 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 
 ## CHANGELOG
 
+### C-002 — Canonical documentation set complete
+**Date:** 2026-07-16
+**Change:** Added the remaining four canonical documents to `/docs` root: `TECHNICAL_ARCHITECTURE.md` and `PRODUCT_DESIGN.md` (split from the pre-split design doc v2.4, now archived at `docs/archive/noisy_design_document.md`), plus `ENGINEERING_PRINCIPLES.md` and `CONTENT_PRODUCTION.md`. All seven canonical docs are now present in `/docs` root: `DOCMAP.md`, `TECHNICAL_ARCHITECTURE.md`, `PRODUCT_DESIGN.md`, `ENGINEERING_PRINCIPLES.md`, `CONTENT_PRODUCTION.md`, `DECISIONS_AND_CHANGELOG.md`, `ROADMAP.md`. Dropped the "(forthcoming)" markers from the `DOCMAP.md` repository-layout tree now that these docs exist.
+**Note:** Completes the incremental documentation build flagged in C-001.
+
 ### C-001 — Documentation infrastructure established
 **Date:** 2026-07-16
 **Change:** Created the canonical documentation set in `/docs`: `DOCMAP.md`, `DECISIONS_AND_CHANGELOG.md`, `TECHNICAL_ARCHITECTURE.md`, `PRODUCT_DESIGN.md`, `ENGINEERING_PRINCIPLES.md`, `CONTENT_PRODUCTION.md`, `ROADMAP.md`. Prior artifacts (`noisy_design_document.md`, `AUDIT_REPORT.md`, `noisy_independent_evaluation.md`) retained as historical inputs.

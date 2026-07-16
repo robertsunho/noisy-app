@@ -48,10 +48,10 @@ Only canonical documents live in the `/docs` root; two subfolders hold everythin
 ```
 docs/
 ├── DOCMAP.md                     ← Tier 1 (this file)
-├── TECHNICAL_ARCHITECTURE.md     ← Tier 2 (forthcoming)
-├── PRODUCT_DESIGN.md             ← Tier 2 (forthcoming)
-├── ENGINEERING_PRINCIPLES.md     ← Tier 3 (forthcoming)
-├── CONTENT_PRODUCTION.md         ← Tier 3 (forthcoming)
+├── TECHNICAL_ARCHITECTURE.md     ← Tier 2
+├── PRODUCT_DESIGN.md             ← Tier 2
+├── ENGINEERING_PRINCIPLES.md     ← Tier 3
+├── CONTENT_PRODUCTION.md         ← Tier 3
 ├── DECISIONS_AND_CHANGELOG.md    ← Tier 3
 ├── ROADMAP.md                    ← Tier 3
 ├── audits/                       ← investigation & audit artifacts (inputs, not canon)
