@@ -142,14 +142,21 @@ class HarmonicMatcher {
 
   /// Finds a binaural carrier frequency placed on a consonant scale degree of
   /// [soundscapeRootHz] that forms a stable triad voicing with [solfeggioHz],
-  /// then octave-transposes the result into the 80–300 Hz felt-bass range.
+  /// then octave-transposes the result into a felt-bass range.
+  ///
+  /// The target range depends on the optional [beatFrequencyHz]: 80–300 Hz by
+  /// default, or 200–400 Hz for beta/gamma beats ([beatFrequencyHz] ≥ 15 Hz),
+  /// where a higher carrier makes the faster beat read as a single beating tone
+  /// rather than two distinct pitches. If no octave lands in range, the carrier
+  /// falls back to the octave nearest the range midpoint (190 Hz default,
+  /// 300 Hz for beta/gamma).
   ///
   /// Degree selection:
   ///   • solfeggio near root (±1 st)  → carrier = Perfect 5th (degree 7)
   ///   • solfeggio near 5th  (±1 st)  → carrier = Root (degree 0)
   ///   • otherwise                    → carrier = Root (degree 0)
   ///
-  /// Among valid octave candidates (80–300 Hz), the one furthest in actual
+  /// Among valid octave candidates in range, the one furthest in actual
   /// (non-octave-folded) semitones from the solfeggio is preferred so the
   /// carrier does not crowd the melodic layer.
   static ({double carrierHz, String degreeName}) findBinauralCarrier(

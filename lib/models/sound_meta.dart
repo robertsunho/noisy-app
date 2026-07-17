@@ -32,7 +32,7 @@ class SoundMeta {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Full sound catalog (33 sounds)
+// Full sound catalog (43 entries — 35 available, 8 coming-soon)
 // ─────────────────────────────────────────────────────────────────────────────
 
 const List<SoundMeta> kSoundCatalog = [

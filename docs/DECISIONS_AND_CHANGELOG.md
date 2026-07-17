@@ -48,6 +48,11 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 
 ## CHANGELOG
 
+### C-005 — Bucket B code comments corrected (R-24..R-26)
+**Date:** 2026-07-17
+**Change:** Corrected three stale code comments/docstrings to match current behavior — comments only, no logic change (`flutter analyze`: no issues). `sound_meta.dart` catalog header (33 → 43 entries, 35 available); `mood_engine.dart` `generateMix` docstring (hardcoded volumes → Remote-Config-driven); `harmonic_matcher.dart` `findBinauralCarrier` docstring (added the `beatFrequencyHz` parameter and the 80–300 / 200–400 Hz range logic). Rulings R-24–R-26 recorded; ROADMAP Bucket B checked off.
+**Reference:** Rulings R-24–R-26; audit items #24, #25, #26.
+
 ### C-004 — Bucket A discrepancies resolved (R-01..R-23)
 **Date:** 2026-07-17
 **Change:** Completed the Bucket A correctness pass — 15 trivial doc fixes verified against code. Fourteen were already reflected in the canonical docs from the v2.4 split/reconciliation; one required an edit: `CONTENT_PRODUCTION.md` had `bowl_low_g` mislabeled as G4/392 Hz, corrected to G3/196 Hz to match `motif_meta.dart`. Rulings R-01–R-23 recorded under DISCREPANCY RULINGS; ROADMAP Bucket A items checked off, and the four now-built Tier 2/3 docs checked off in Phase 1.
@@ -93,3 +98,11 @@ Trivial doc fixes (doc wrong, code right; no judgment needed). Of the 15, fourte
 - **R-21** — doc wrong / code right — both docs already state 9 unique soundscape roots (verified: 10 soundscapes → 9 pitch classes).
 - **R-22** — doc wrong / code right — both docs already state 10 frequency entries including 432 Hz (verified in code).
 - **R-23** — doc wrong / code right — `CONTENT_PRODUCTION.md` §7 already uses the singular `mood_profile.dart`.
+
+### Bucket B — resolved (2026-07-17)
+
+Code-comment / docstring fixes (code's own comments contradicted the code; comments only, no behavior change). Each verified against the code before rewriting; `flutter analyze` clean afterward.
+
+- **R-24** — code comment stale — corrected to match behavior — `sound_meta.dart` catalog header said "(33 sounds)"; updated to "43 entries — 35 available, 8 coming-soon", verified against `kSoundCatalog` (43 entries, 8 `isAvailable: false`).
+- **R-25** — code comment stale — corrected to match behavior — `generateMix` docstring cited hardcoded layer volumes (0.55/0.35/0.30/0.35/0.30); reworded to state the five volumes are read from Remote Config (`soundscape_volume`, `nature_volume`, `noise_volume`, `binaural_volume`, `frequency_volume`) with in-code defaults.
+- **R-26** — code comment stale — corrected to match behavior — `findBinauralCarrier` docstring omitted the `beatFrequencyHz` parameter and the 200–400 Hz (beta/gamma, ≥15 Hz) branch; documented both plus the 190/300 Hz fallback midpoints. Docstring only — crown-jewel logic untouched.

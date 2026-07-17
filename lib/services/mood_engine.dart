@@ -26,11 +26,15 @@ class MoodEngine {
   // ── Public API ────────────────────────────────────────────────────────────
 
   /// Returns 3–5 sounds for the given mood:
-  ///   • 1 soundscape  (always selected)                        → vol 0.55
-  ///   • 1 nature      (always selected)                        → vol 0.35
-  ///   • 1 noise color (always selected)                        → vol 0.30
-  ///   • 1 binaural    (skipped if best distance > 1.2)         → vol 0.35
-  ///   • 1 frequency   (skipped if best distance > 1.2)         → vol 0.30
+  ///   • 1 soundscape  (always selected)
+  ///   • 1 nature      (always selected)
+  ///   • 1 noise color (always selected)
+  ///   • 1 binaural    (skipped if best distance > 1.2)
+  ///   • 1 frequency   (skipped if best distance > 1.2)
+  ///
+  /// Per-layer volumes are read from Remote Config (`soundscape_volume`,
+  /// `nature_volume`, `noise_volume`, `binaural_volume`, `frequency_volume`)
+  /// with in-code defaults — not hardcoded here.
   List<SoundRecommendation> generateMix(
       double energy, double focus, double warmth) {
     return _selectByCategory(energy, focus, warmth);

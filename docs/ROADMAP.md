@@ -45,9 +45,9 @@ Fast. Correct the design doc / new canonical docs to match the code.
 ### Bucket B — Code-comment / intra-code fixes (code's own comments contradict code)
 Fast. Update stale comments/docstrings in the code.
 
-- [ ] #24 — `sound_meta.dart` header comment says "33 sounds"; there are 43 (doc is right here)
-- [ ] #25 — `generateMix` docstring lists hardcoded volumes now read from Remote Config
-- [ ] #26 — (intra-code, per audit) — confirm and fix
+- [x] #24 — `sound_meta.dart` header comment says "33 sounds"; there are 43 (doc is right here)
+- [x] #25 — `generateMix` docstring lists hardcoded volumes now read from Remote Config
+- [x] #26 — (intra-code, per audit) — confirm and fix
 
 ### Bucket C — Design-flavored rulings (behavioral/product consequences; needs Robert)
 Slow. These are latent bugs or design decisions. Some may be *promoted* into the Phase 4 V2 plan rather than ruled on in isolation.
