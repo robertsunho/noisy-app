@@ -7,15 +7,15 @@ Forward-looking plan for Noisy. Claude Code marks items complete (`[x]`) as work
 
 ---
 
-## Phase 1 — Documentation Infrastructure *(in progress)*
+## Phase 1 — Documentation Infrastructure *(complete)*
 
 - [x] `DOCMAP.md` — doc set orientation
 - [x] `DECISIONS_AND_CHANGELOG.md` — append-only record, seeded with prior decisions
 - [x] `ROADMAP.md` — this file
-- [ ] `TECHNICAL_ARCHITECTURE.md` — split from design doc v2.4, corrected, engine layer
-- [ ] `PRODUCT_DESIGN.md` — split from design doc v2.4, vision-first, product layer
-- [ ] `ENGINEERING_PRINCIPLES.md` — Noisy-specific invariants/guardrails
-- [ ] `CONTENT_PRODUCTION.md` — production spec + asset registry (from existing checklist)
+- [x] `TECHNICAL_ARCHITECTURE.md` — split from design doc v2.4, corrected, engine layer
+- [x] `PRODUCT_DESIGN.md` — split from design doc v2.4, vision-first, product layer
+- [x] `ENGINEERING_PRINCIPLES.md` — Noisy-specific invariants/guardrails
+- [x] `CONTENT_PRODUCTION.md` — production spec + asset registry (from existing checklist)
 
 ---
 
@@ -26,21 +26,21 @@ Each discrepancy from `AUDIT_REPORT.md` is triaged into one of three buckets (pe
 ### Bucket A — Trivial doc fixes (doc wrong, code right; no judgment needed)
 Fast. Correct the design doc / new canonical docs to match the code.
 
-- [ ] #1 — Flutter version (doc says 3.41.1; actual 3.44.6)
-- [ ] #2 — §3 file structure omits `analytics_service.dart`, `firebase_options.dart`
-- [ ] #3 — §3 noise list says "yellow"; the 5th available noise is "red"
-- [ ] #9 — §4.5 `findBinauralCarrier` stale signature/range (doc contradicts itself; §4.5 is stale half)
-- [ ] #11 — `bowl_high_g` documented an octave off (G4 vs actual G5) — doc-only, no behavioral impact
-- [ ] #12 — `low_bell_eb` documented an octave off (Eb4 vs actual Eb3) — doc-only
-- [ ] #13 — three motif root freqs rounded differently (inaudible; doc for completeness)
-- [ ] #16 — "43 available sounds" → 43 total, 35 available
-- [ ] #19 — §13.2 lists a "gong C3" that doesn't exist (real 6th tonal motif is `triangle_e`)
-- [ ] #20 — §13.2 says no motifs in E; `triangle_e` is in E
-- [ ] #21 — §13.2 says 8 unique soundscape roots; there are 9 (doc's own arithmetic confirms 9)
-- [ ] #22 — §13.3 says 9 solfeggio frequencies; catalog has 10 (432 Hz omitted)
-- [ ] #23 — §13.9 names `mood_profiles.dart`; actual file is `mood_profile.dart` (singular)
-- [ ] #7 — §4.4 presents 5 layer volumes as constants; they are Remote Config reads (numbers match defaults)
-- [ ] #6 — §4.4 "density scales with energy" describes interpolation the code doesn't do (values match RC defaults). *Rule after #5 — same Meditate/Relax density thread.*
+- [x] #1 — Flutter version (doc says 3.41.1; actual 3.44.6)
+- [x] #2 — §3 file structure omits `analytics_service.dart`, `firebase_options.dart`
+- [x] #3 — §3 noise list says "yellow"; the 5th available noise is "red"
+- [x] #9 — §4.5 `findBinauralCarrier` stale signature/range (doc contradicts itself; §4.5 is stale half)
+- [x] #11 — `bowl_high_g` documented an octave off (G4 vs actual G5) — doc-only, no behavioral impact
+- [x] #12 — `low_bell_eb` documented an octave off (Eb4 vs actual Eb3) — doc-only
+- [x] #13 — three motif root freqs rounded differently (inaudible; doc for completeness)
+- [x] #16 — "43 available sounds" → 43 total, 35 available
+- [x] #19 — §13.2 lists a "gong C3" that doesn't exist (real 6th tonal motif is `triangle_e`)
+- [x] #20 — §13.2 says no motifs in E; `triangle_e` is in E
+- [x] #21 — §13.2 says 8 unique soundscape roots; there are 9 (doc's own arithmetic confirms 9)
+- [x] #22 — §13.3 says 9 solfeggio frequencies; catalog has 10 (432 Hz omitted)
+- [x] #23 — §13.9 names `mood_profiles.dart`; actual file is `mood_profile.dart` (singular)
+- [x] #7 — §4.4 presents 5 layer volumes as constants; they are Remote Config reads (numbers match defaults)
+- [x] #6 — §4.4 "density scales with energy" describes interpolation the code doesn't do (values match RC defaults). *Rule after #5 — same Meditate/Relax density thread.*
 
 ### Bucket B — Code-comment / intra-code fixes (code's own comments contradict code)
 Fast. Update stale comments/docstrings in the code.

@@ -61,7 +61,7 @@ The production spec and asset registry for Noisy's audio content. Covers what ex
 **Missing roots:** Db, Eb, Bb. **Major/minor balance:** 8 major, 2 minor (minor underrepresented).
 
 ### Motifs (9) — *corrected per audit #19*
-- **Tonal (6):** bowl_high_g (**G5**, 784 Hz), bowl_low_g (G4, 392 Hz), high_bell_b (B4, 493.9 Hz), low_bell_eb (**Eb3**, 155.6 Hz), piano_note_f (F4, 349.2 Hz), **triangle_e (E4, 329.6 Hz)** — *there is no "gong C3"*
+- **Tonal (6):** bowl_high_g (**G5**, 784 Hz), bowl_low_g (**G3**, 196 Hz), high_bell_b (B4, 493.9 Hz), low_bell_eb (**Eb3**, 155.6 Hz), piano_note_f (F4, 349.2 Hz), **triangle_e (E4, 329.6 Hz)** — *there is no "gong C3"*
 - **Atonal (3):** gourd_percussion, vibe_chimes, wind_chimes
 - *Motif tag assignments have open Bucket-C rulings (audit #14/#15) — see `ROADMAP.md`.*
 
