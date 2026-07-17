@@ -2,7 +2,7 @@
 
 Forward-looking plan for Noisy. Claude Code marks items complete (`[x]`) as work lands, with a Changelog entry for each. Ordered by phase; phases are sequenced but not time-boxed.
 
-**Last updated:** July 16, 2026
+**Last updated:** July 17, 2026
 **Current phase:** Phase 2 — Infrastructure & Reconciliation
 
 ---
@@ -40,7 +40,7 @@ Fast. Correct the design doc / new canonical docs to match the code.
 - [ ] #22 — §13.3 says 9 solfeggio frequencies; catalog has 10 (432 Hz omitted)
 - [ ] #23 — §13.9 names `mood_profiles.dart`; actual file is `mood_profile.dart` (singular)
 - [ ] #7 — §4.4 presents 5 layer volumes as constants; they are Remote Config reads (numbers match defaults)
-- [ ] #6 — §4.4 "density scales with energy" describes interpolation the code doesn't do (values match RC defaults)
+- [ ] #6 — §4.4 "density scales with energy" describes interpolation the code doesn't do (values match RC defaults). *Rule after #5 — same Meditate/Relax density thread.*
 
 ### Bucket B — Code-comment / intra-code fixes (code's own comments contradict code)
 Fast. Update stale comments/docstrings in the code.
@@ -48,21 +48,23 @@ Fast. Update stale comments/docstrings in the code.
 - [ ] #24 — `sound_meta.dart` header comment says "33 sounds"; there are 43 (doc is right here)
 - [ ] #25 — `generateMix` docstring lists hardcoded volumes now read from Remote Config
 - [ ] #26 — (intra-code, per audit) — confirm and fix
-- [ ] #27 — (intra-code, per audit) — confirm and fix
 
 ### Bucket C — Design-flavored rulings (behavioral/product consequences; needs Robert)
 Slow. These are latent bugs or design decisions. Some may be *promoted* into the Phase 4 V2 plan rather than ruled on in isolation.
 
 - [ ] #4 — `addLayer` fades to hardcoded 0.7, not "to target" as doc claims. *Ruling needed: is 0.7 intended, or should sample layers honor a target like tones do?*
+- [ ] #27 — `_loadWaypoint` comment asserts layers preload at volume 0; sample/soundscape layers actually fade to 0.7 via `addLayer`. *Paired with #4 — fix is comment-or-code depending on #4's ruling.*
 - [ ] #5 — mood→category thresholds in doc match nothing in code; doc's Meditate rule is code's Relax rule. *Ruling needed: are the code's current thresholds the intended design, or did they drift? Affects which journey whole slider regions produce.*
 - [ ] #8 — undocumented behaviors: ±0.05 waypoint perturbation; hardcoded Sleep density 0.1 (not RC-driven). *Ruling: document as intended, or reconsider?*
 - [ ] #10 — `Journey.sleepTimer` motif support never wired at its only call site; motifs keep firing after sleep-timer fade. Also: `toSource()` drops pitch-shift on snapshot. *Likely a bug to fix; confirm intent.*
 - [ ] #15 — `piano_note_f` and `gourd_percussion` lost tags in code; `piano_note_f` can never be selected for Sleep/Meditate despite doc. *Ruling: restore tags, or is the code's tagging intended?*
 - [ ] #14 — seven motifs carry more tags in code than doc (code is superset). *Ruling: is the code's broader tagging intended? Update doc if so.*
+- [ ] #17 — Mixer has its own separate 25-entry catalog: no soundscape is reachable from the Mixer, binaural/frequency are served as MP3 samples (not synthesis), and it is a second hand-maintained catalog. *Ruling: is the soundscape-less, samples-not-synthesis Mixer intended, or a gap to close?*
+- [ ] #18 — Library "Browse All" advertises 43 sounds but renders 33 (`'soundscape'` missing from `_kCategoryOrder`; no label/icon keys either). Code bug. *Ruling: add soundscapes to Browse All, or correct the advertised count to 33?*
 - [ ] #28 — beta/gamma carrier range: `beatFrequencyHz` param built but not passed from `mood_engine.dart` call site. *Known issue; wire it, or defer with intent recorded.*
 - [ ] #29 — curated journeys still use legacy `SampleSource` MP3s, bypassing the harmonic system. *First-impression issue: "curated" showcase hears the old product. Promote to V2?*
 
-> **Note:** Audit IDs #17, #18 and any not listed above to be slotted into a bucket when the correctness pass begins by re-reading `AUDIT_REPORT.md` in full. This roadmap captures the triage structure; the pass confirms completeness.
+> **Note:** All 29 discrepancies are now bucketed — A = 15, B = 3, C = 11. Triage corrected per Decision **D-006** (see Changelog **C-003**).
 
 ---
 

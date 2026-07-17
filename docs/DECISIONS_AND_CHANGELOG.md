@@ -11,6 +11,12 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 
 ## DECISIONS
 
+### D-006 — Discrepancy triage corrected: #17/#18 slotted to C, #27 moved B→C
+**Date:** 2026-07-17
+**Decision:** After validating the Phase 2 triage line-by-line against `docs/audits/AUDIT_REPORT.md`, three corrections were approved. (1) #17 (the Mixer's separate 25-entry catalog) and #18 (Library "Browse All" advertises 43 sounds but renders 33) are slotted into **Bucket C**, not left in the "to be slotted" note. (2) #27 (`_loadWaypoint`'s "layers preload at volume 0" comment) moves from **Bucket B to Bucket C**, paired with #4. #26 remains in Bucket B. Resulting counts: A = 15, B = 3, C = 11.
+**Why:** #17 and #18 are not clerical doc fixes. #17 raises design questions — soundscapes are unreachable from the Mixer, binaural/frequency are served as MP3 samples rather than synthesis, and a second catalog must be hand-synced. #18 is a genuine code bug carrying a product choice (show soundscapes in Browse All vs. correct the count). #27 asserts an *intended invariant* ("volume intentionally left at 0") that the same `addLayer`-fades-to-0.7 behavior #4 is ruling on violates; correcting #27's comment in isolation could enshrine a latent bug as intended behavior — exactly what the drift-resolution protocol (D-003, and `CLAUDE.md`) forbids. #27's fix is therefore comment-or-code depending on #4's ruling.
+**References:** D-003 (three-bucket triage); audit items #4, #17, #18, #26, #27.
+
 ### D-005 — Documentation is authored in conversation, committed via Claude Code
 **Date:** 2026-07-16
 **Decision:** Canonical docs are drafted by Claude in conversation, then committed to the repo by Claude Code. Thinking-heavy docs are drafted this way; mechanical updates may be delegated to Claude Code directly.
@@ -41,6 +47,11 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 ---
 
 ## CHANGELOG
+
+### C-003 — Roadmap Phase 2 triage corrected (D-006)
+**Date:** 2026-07-17
+**Change:** Applied the approved triage correction to `docs/ROADMAP.md` Phase 2: moved #17 and #18 into Bucket C (removed from the "to be slotted" note), moved #27 from Bucket B to Bucket C (annotated as paired with #4), added a "rule after #5" note to #6 in Bucket A, and cleared the stale "to be slotted" note. All 29 discrepancies are now bucketed: A = 15, B = 3, C = 11.
+**Reference:** Decision D-006.
 
 ### C-002 — Canonical documentation set complete
 **Date:** 2026-07-16
