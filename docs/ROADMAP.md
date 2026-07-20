@@ -52,8 +52,8 @@ Fast. Update stale comments/docstrings in the code.
 ### Bucket C — Design-flavored rulings (behavioral/product consequences; needs Robert)
 Slow. These are latent bugs or design decisions. Some may be *promoted* into the Phase 4 V2 plan rather than ruled on in isolation.
 
-- [ ] #4 — `addLayer` fades to hardcoded 0.7, not "to target" as doc claims. *Ruling needed: is 0.7 intended, or should sample layers honor a target like tones do?*
-- [ ] #27 — `_loadWaypoint` comment asserts layers preload at volume 0; sample/soundscape layers actually fade to 0.7 via `addLayer`. *Paired with #4 — fix is comment-or-code depending on #4's ruling.*
+- [x] #4 — `addLayer` fades to hardcoded 0.7, not "to target" as doc claims. *Ruled R-04 (D-007): 0.7 retained as default; `addLayer` gained an optional `volume:` target so it can honor a target like tones do. Behavior unchanged — journey-engine passing real targets deferred to V2.*
+- [x] #27 — `_loadWaypoint` comment asserts layers preload at volume 0; sample/soundscape layers actually fade to 0.7 via `addLayer`. *Ruled R-27: comment corrected to describe the real preload/interpolation sequence; paired with #4.*
 - [ ] #5 — mood→category thresholds in doc match nothing in code; doc's Meditate rule is code's Relax rule. *Ruling needed: are the code's current thresholds the intended design, or did they drift? Affects which journey whole slider regions produce.*
 - [ ] #8 — undocumented behaviors: ±0.05 waypoint perturbation; hardcoded Sleep density 0.1 (not RC-driven). *Ruling: document as intended, or reconsider?*
 - [ ] #10 — `Journey.sleepTimer` motif support never wired at its only call site; motifs keep firing after sleep-timer fade. Also: `toSource()` drops pitch-shift on snapshot. *Likely a bug to fix; confirm intent.*

@@ -68,7 +68,7 @@ Manages all active audio layers — sample-based (just_audio) and tone-based (fl
 
 - Up to **5 simultaneous layers** (samples and tones counted together; motifs are separate and do not count toward the cap)
 - Independent volume control per layer
-- **Smooth transitions:** `addLayer` starts at 0 and fades in over 1.5s to a **fixed 0.7** *(audit #4 — the doc previously said "fades to target"; sample layers use a hardcoded 0.7, while `addToneLayer`/`addBinauralLayer` honor a `volume:` target. Whether 0.7 should become a real target is an open Bucket-C ruling.)*; `removeLayer` fades to 0 over 1s before disposal
+- **Smooth transitions:** `addLayer` starts at 0 and fades in over 1.5s to an optional `volume:` target that **defaults to 0.7** *(audit #4, ruled R-04/D-007 — `addLayer` now mirrors `addToneLayer`/`addBinauralLayer`, which already honor a `volume:` target; with the default in place every existing call site is unchanged, so present behavior is identical. Having the journey engine pass real per-layer targets on add is deferred to V2.)*; `removeLayer` fades to 0 over 1s before disposal
 - **Crossfade looping** for sample layers: two-player system with a 3s crossfade window starting 3.5s before the loop point. Uses **equal-power (cos/sin) curves** so perceived loudness stays constant through the transition (sin²+cos²=1, avoiding the ~3dB dip of linear fades)
   - *Perf note (external eval §2 #2): `_startCrossfade` allocates and decodes a fresh `AudioPlayer` every loop cycle of every sample layer.*
 - **Tone layers** via ToneService: `addToneLayer()`, `addBinauralLayer()`, with real-time frequency/volume control

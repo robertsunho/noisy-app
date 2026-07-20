@@ -147,8 +147,14 @@ class JourneyEngine extends ChangeNotifier {
 
   // ── Waypoint loading ─────────────────────────
 
-  /// Preloads all source layers from [waypoint] into the engine at volume 0.
-  /// Actual volumes are ramped up by [_applyInterpolation] via [_startupRamp].
+  /// Preloads all source layers from [waypoint] into the engine. Tone and
+  /// binaural layers start at volume 0 (passed explicitly). Sample and
+  /// soundscape layers begin fading toward [AudioEngine.addLayer]'s default
+  /// (0.7) the moment they're added — the first [_applyInterpolation] tick then
+  /// calls `setVolume`, which cancels that fade and pins the layer to its
+  /// interpolated target. Net effect: every layer converges on the
+  /// interpolated volume; sample/soundscape layers may show a brief upward
+  /// transient (bounded by [_startupRamp]) before the first tick lands.
   Future<void> _loadWaypoint(JourneyWaypoint waypoint) async {
     if (_engine == null) return;
     for (final src in waypoint.layers) {
@@ -201,7 +207,9 @@ class JourneyEngine extends ChangeNotifier {
           targetFrequency: toneFreq,
         );
       }
-      // Volume intentionally left at 0; _applyInterpolation handles the ramp.
+      // Tone/binaural layers stay at 0 here; sample/soundscape layers are
+      // mid-fade toward 0.7. Either way, _applyInterpolation's first tick
+      // (setVolume) takes over and drives each layer to its interpolated value.
     }
   }
 

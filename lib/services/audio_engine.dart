@@ -108,8 +108,11 @@ class AudioEngine extends ChangeNotifier {
 
   // ── Sample layer commands ─────────────────────────────────────────────────
 
-  /// Adds a sample-based layer starting at volume 0 and fades it up to 0.7.
-  Future<void> addLayer(String assetPath, String name) async {
+  /// Adds a sample-based layer starting at volume 0 and fades it in over 1.5s
+  /// to [volume] (default 0.7). Mirrors the `volume:` target that
+  /// [addToneLayer] and [addBinauralLayer] already accept.
+  Future<void> addLayer(String assetPath, String name,
+      {double volume = 0.7}) async {
     if (isFull || hasLayer(assetPath)) return;
 
     final player = AudioPlayer();
@@ -127,7 +130,7 @@ class AudioEngine extends ChangeNotifier {
     notifyListeners();
 
     unawaited(player.play());
-    _startFade(layer, 0.7, const Duration(milliseconds: 1500));
+    _startFade(layer, volume.clamp(0.0, 1.0), const Duration(milliseconds: 1500));
     _setupLayerLooping(layer);
   }
 

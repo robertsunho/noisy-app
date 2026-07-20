@@ -11,6 +11,13 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 
 ## DECISIONS
 
+### D-007 — `addLayer` gains an optional volume target; journey-engine passing real targets deferred to V2
+**Date:** 2026-07-20
+**Decision:** Ruling on audit #4 (paired with #27). The hardcoded 0.7 in `AudioEngine.addLayer` is **retained as the default**, but `addLayer` gains an optional `volume:` named parameter (clamped [0.0, 1.0]) so it can express "add this layer at this volume" — matching how `addToneLayer` / `addBinauralLayer` already honor a `volume:` target. This is a capability-adding, behavior-preserving change: with the default in place, every existing call site (journey engine, mixer screen, library screen) behaves identically to today. #27's comment is corrected in the same change to describe the real preload/interpolation sequence.
+**Road not taken (deferred to V2):** Having the journey engine pass correct per-layer targets on layer-add — which would eliminate the ~200ms 0.7 transient before `_applyInterpolation`'s first tick, and the tone/sample asymmetry at the `_loadWaypoint` call sites — was considered and **consciously deferred**. It tunes behavior inside the mood/journey generation path that the V2 overhaul will likely rework, so tuning it now risks re-doing (or re-breaking) work the overhaul subsumes. The optional-parameter change, by contrast, adds capability without behavioral risk.
+**Guiding principle:** When facing an overhaul, prefer changes that add optionality without changing behavior; defer behavior tuning that lives in a code path the overhaul will rework.
+**References:** Audit items #4, #27; rulings R-04, R-27; D-006 (which paired #27 with #4 and moved it to Bucket C).
+
 ### D-006 — Discrepancy triage corrected: #17/#18 slotted to C, #27 moved B→C
 **Date:** 2026-07-17
 **Decision:** After validating the Phase 2 triage line-by-line against `docs/audits/AUDIT_REPORT.md`, three corrections were approved. (1) #17 (the Mixer's separate 25-entry catalog) and #18 (Library "Browse All" advertises 43 sounds but renders 33) are slotted into **Bucket C**, not left in the "to be slotted" note. (2) #27 (`_loadWaypoint`'s "layers preload at volume 0" comment) moves from **Bucket B to Bucket C**, paired with #4. #26 remains in Bucket B. Resulting counts: A = 15, B = 3, C = 11.
@@ -47,6 +54,11 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 ---
 
 ## CHANGELOG
+
+### C-006 — `addLayer` accepts optional volume target (Bucket C: R-04, R-27)
+**Date:** 2026-07-20
+**Change:** Per ruling D-007, added an optional `{double volume = 0.7}` parameter to `AudioEngine.addLayer` and routed it (clamped [0.0, 1.0]) through the existing `_startFade(layer, volume, 1500ms)` call in place of the literal 0.7; the 1.5s fade duration is unchanged. Updated the `addLayer` docstring to describe the real behavior. **No behavior change** — the default preserves the prior 0.7, and no existing call site was modified (verified: all `addLayer(` callers in `journey_engine.dart`, `mixer_screen.dart`, `library_screen.dart` still pass `(path, name)`). Corrected the `_loadWaypoint` docstring and inline comment in `journey_engine.dart` (#27) to describe the actual preload/interpolation sequence — tone/binaural layers preload at 0, sample/soundscape layers begin fading toward 0.7 and are pinned by `_applyInterpolation`'s first `setVolume` tick (which cancels the fade). `flutter analyze`: no issues. Updated `TECHNICAL_ARCHITECTURE.md` §3.1 "Smooth transitions"; checked off #4/#27 in ROADMAP Bucket C.
+**Reference:** Decision D-007; rulings R-04, R-27; audit items #4, #27.
 
 ### C-005 — Bucket B code comments corrected (R-24..R-26)
 **Date:** 2026-07-17
@@ -106,3 +118,10 @@ Code-comment / docstring fixes (code's own comments contradicted the code; comme
 - **R-24** — code comment stale — corrected to match behavior — `sound_meta.dart` catalog header said "(33 sounds)"; updated to "43 entries — 35 available, 8 coming-soon", verified against `kSoundCatalog` (43 entries, 8 `isAvailable: false`).
 - **R-25** — code comment stale — corrected to match behavior — `generateMix` docstring cited hardcoded layer volumes (0.55/0.35/0.30/0.35/0.30); reworded to state the five volumes are read from Remote Config (`soundscape_volume`, `nature_volume`, `noise_volume`, `binaural_volume`, `frequency_volume`) with in-code defaults.
 - **R-26** — code comment stale — corrected to match behavior — `findBinauralCarrier` docstring omitted the `beatFrequencyHz` parameter and the 200–400 Hz (beta/gamma, ≥15 Hz) branch; documented both plus the 190/300 Hz fallback midpoints. Docstring only — crown-jewel logic untouched.
+
+### Bucket C — in progress (2026-07-20)
+
+Design-flavored rulings that carry behavioral/product consequences. Ruled with a recorded decision where one is needed; see the referenced `D-###` entry.
+
+- **R-04** — code capability gap — `addLayer` gained an optional `volume:` target (default 0.7); behavior unchanged. `AudioEngine.addLayer` now mirrors `addToneLayer`/`addBinauralLayer` by accepting a `volume:` named parameter, clamped [0.0, 1.0] and routed through the existing 1.5s `_startFade`. The 0.7 default preserves every current call site's behavior; having the journey engine pass real targets was considered and deferred to V2. See D-007.
+- **R-27** — code comment stale — corrected to match behavior — paired with #4. The `_loadWaypoint` docstring and inline comment asserted layers preload at volume 0, contradicted by the 0.7 `addLayer` fade for sample/soundscape layers. Rewrote both to describe the real sequence: tone/binaural preload at 0; sample/soundscape begin fading toward 0.7 and are pinned by `_applyInterpolation`'s first `setVolume` tick (which cancels the fade). Preload logic unchanged — comment only.
