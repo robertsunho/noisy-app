@@ -11,6 +11,13 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 
 ## DECISIONS
 
+### D-009 — Motif tagging (#14/#15) resolved; tag taxonomy is provisional, not a design commitment
+**Date:** 2026-07-20
+**Decision:** Ruling on the two motif-tagging discrepancies. **#15 (code wrong):** `piano_note_f` and `gourd_percussion` had lost tags the design intended, so `piano_note_f` could **never** be selected for Sleep or Meditate journeys. Restored the missing tags — `meditate` + `sleep` to `piano_note_f`, `meditate` to `gourd_percussion` (additive; the code's other tags were kept). **#14 (doc wrong):** the seven motifs whose code tag sets are strict supersets of the doc are accepted as intended; `CONTENT_PRODUCTION.md` §3 was updated to match the code rather than the code trimmed to the doc.
+**Why restore (#15):** With only nine motifs total, an unnecessarily narrow palette meaningfully impoverishes generative variety in the highest-use categories (Sleep, Meditate). The intent — a sleep/meditate-capable piano and gourd — is legible in the doc; the code had drifted from it.
+**Provisional, not considered taxonomy:** The current tag vocabulary is a *thin* set over nine motifs. As the library expands toward 20–27 motifs (see `CONTENT_PRODUCTION.md`), the tag vocabulary **and** the way `_selectMotifPalette` queries it are expected to be substantially reworked or replaced in V2. This restoration is therefore a **stopgap that improves the present palette, not a design commitment** — today's tag set should not be read as a settled taxonomy. Restricted to tags only: `MotifMeta` structure and the selection logic in `mood_engine.dart` / `motif_engine.dart` were left untouched.
+**References:** Audit items #14, #15; rulings R-14, R-15; `CONTENT_PRODUCTION.md` §3.
+
 ### D-008 — Sleep-timer defects (#10) ruled bugs, not design — both fixed
 **Date:** 2026-07-20
 **Decision:** Ruling on audit #10, both halves. (A) `Journey.sleepTimer` accepts a `motifEngine` and builds a `MotifSource` fading density to 0, but its only call site (`journey_screen.dart` `_startSleepTimer`) never passed one — so motifs kept firing at full density after the mix faded to silence. (B) `toSource()` reconstructed soundscape layers as plain `SampleSource`, dropping `pitchShiftRatio` so the layer reverted to unshifted playback for the timer's duration. **Both are ruled genuine bugs — the feature does not work as designed — and both are fixed now**, not deferred.
@@ -62,6 +69,11 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 ---
 
 ## CHANGELOG
+
+### C-008 — Restore missing motif tags; accept code tag superset (Bucket C: R-14, R-15)
+**Date:** 2026-07-20
+**Change:** Per ruling D-009, edited motif tags in `motif_meta.dart` (tags only — `MotifMeta` structure and `mood_engine.dart` / `motif_engine.dart` selection logic untouched). **R-15:** restored the tags audit #15 flagged as lost — `piano_note_f` `['focus', 'relax', 'energize']` → `['focus', 'relax', 'energize', 'meditate', 'sleep']` (regains Sleep/Meditate selectability); `gourd_percussion` `['energize', 'relax']` → `['energize', 'relax', 'meditate']`. **R-14:** the seven superset motifs from audit #14 are left as-is (broader tagging accepted as intended); `CONTENT_PRODUCTION.md` §3 gained a per-motif tag table matching the code and dropped the "open Bucket-C rulings (audit #14/#15)" annotation. `flutter analyze`: no issues. Checked off #14/#15 in ROADMAP Bucket C.
+**Reference:** Decision D-009; rulings R-14, R-15; audit items #14, #15.
 
 ### C-007 — Sleep timer fades motifs and preserves pitch (Bucket C: R-10)
 **Date:** 2026-07-20
@@ -138,4 +150,6 @@ Design-flavored rulings that carry behavioral/product consequences. Ruled with a
 
 - **R-04** — code capability gap — `addLayer` gained an optional `volume:` target (default 0.7); behavior unchanged. `AudioEngine.addLayer` now mirrors `addToneLayer`/`addBinauralLayer` by accepting a `volume:` named parameter, clamped [0.0, 1.0] and routed through the existing 1.5s `_startFade`. The 0.7 default preserves every current call site's behavior; having the journey engine pass real targets was considered and deferred to V2. See D-007.
 - **R-27** — code comment stale — corrected to match behavior — paired with #4. The `_loadWaypoint` docstring and inline comment asserted layers preload at volume 0, contradicted by the 0.7 `addLayer` fade for sample/soundscape layers. Rewrote both to describe the real sequence: tone/binaural preload at 0; sample/soundscape begin fading toward 0.7 and are pinned by `_applyInterpolation`'s first `setVolume` tick (which cancels the fade). Preload logic unchanged — comment only.
+- **R-14** — doc wrong / code right — the code's broader tag sets (seven motifs whose tags are strict supersets of the doc) are accepted as intended; documentation updated to match. `CONTENT_PRODUCTION.md` §3 gained a per-motif tag table mirroring `motif_meta.dart`; no code tags changed for these seven. See D-009 (taxonomy provisional).
+- **R-15** — code wrong / doc right — restored the missing tags to `piano_note_f` (added `meditate`, `sleep`) and `gourd_percussion` (added `meditate`); `piano_note_f` is again selectable for Sleep/Meditate journeys. Additive edit only — the code's existing tags were kept, consistent with R-14. Tags only; selection logic untouched. See D-009 (stopgap, not a design commitment).
 - **R-10** — code bug — both defects fixed: motif engine now wired at the sleep-timer call site; `toSource()` preserves soundscape pitch shift. (A) `JourneyScreen` now holds a `MotifEngine` (injected from `main.dart`) and `_startSleepTimer` passes it to both `Journey.sleepTimer` and `journeyEngine.start`, so running motifs fade to silence with the mix instead of firing on after the fade. (B) `toSource()` reconstructs soundscape layers as `SoundscapeSource` with `pitchShiftRatio` read from the live layer, preserving harmonic tuning across the snapshot (`rootFrequency` defaulted — not tracked per-layer, inert on the reload path). Surgical: no timing/curve changes, `harmonic_matcher.dart` untouched. Ruled bug-not-design and reinforced by the emerging LP/Radio product axis — see D-008 and `PRODUCT_DESIGN.md` §3.7.

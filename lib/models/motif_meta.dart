@@ -57,7 +57,7 @@ const List<MotifMeta> kMotifCatalog = [
     name: 'Piano Note F',
     assetPath: 'assets/audio/motifs/piano_note_f.mp3',
     rootFrequency: 349.2, // F4
-    tags: ['focus', 'relax', 'energize'],
+    tags: ['focus', 'relax', 'energize', 'meditate', 'sleep'],
   ),
   MotifMeta(
     id: 'triangle_e',
@@ -71,7 +71,7 @@ const List<MotifMeta> kMotifCatalog = [
     name: 'Gourd Percussion',
     assetPath: 'assets/audio/motifs/gourd_percussion.mp3',
     rootFrequency: null, // atonal
-    tags: ['energize', 'relax'],
+    tags: ['energize', 'relax', 'meditate'],
   ),
   MotifMeta(
     id: 'vibe_chimes',
