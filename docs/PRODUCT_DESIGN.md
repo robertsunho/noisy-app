@@ -63,6 +63,21 @@ The disparate layers currently sum without binding into one space. A candidate *
 ### 3.6 First-impression integrity
 The five curated Journeys still use legacy `SampleSource` MP3s and **bypass the harmonic system entirely** *(audit #29 / external eval §3b)* — so a first-time user sampling "Journeys" hears the *old* product, not the differentiated one. Resolving this is both a correctness item and a product-first-impression priority.
 
+### 3.7 The LP / Radio axis (emerging)
+> **Status: emerging — a direction, not a settled design.** Surfaced in an external design conversation; recorded here so it can steer V2 framing without yet committing to it.
+
+The organizing distinction for the product's forms is **bounded vs. infinite**:
+
+- **LP** — a piece that *ends*. Composed, personal, lean-in; it has an arc and a final resolution. You put it on and it takes you somewhere and then it's over.
+- **Radio** — continuous. Live, shared, lean-back; it's *already playing* when you tune in, and it keeps going after you leave.
+
+Why this may be the right spine:
+- **A generated LP is a journey wearing its true clothes.** `JourneyEngine`'s timed phases and interpolated transitions (`TECHNICAL_ARCHITECTURE.md` §3.3) are effectively *album structure* already — waypoints are movements, the weight/curve interpolation is the segue between them. The LP form doesn't require a new engine; it renames and re-presents one we have.
+- **Knowing how to end is a differentiator.** Generative competitors produce endless streams; a piece that resolves and stops is a *musical statement* they don't make. A bounded object is also **nameable, saveable, and shareable** in a way an infinite stream is not — it can be an artifact a person keeps and passes on.
+- **The sleep timer is subsumed by the LP form.** An ending is built into the object itself, so "fade the mix out after N minutes" stops being a bolted-on utility and becomes a property of the piece. (A gradual fade-out on **Radio** remains possible — Radio can still be brought down gently; it simply isn't *defined* by an ending the way an LP is.)
+
+This axis is compatible with, and may reframe, the input/output frontiers above (§3.1–3.2): choosing "an LP" vs. "the Radio" is itself a present-tense, human-legible way to say what you want right now.
+
 ---
 
 ## 4. Core Experience (current intended flow, engine-level)

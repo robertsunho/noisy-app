@@ -189,6 +189,24 @@ class Journey {
       if (l.isTone && l.toneFreq != null) {
         return ToneSource(frequency: l.toneFreq!, volume: vol);
       }
+      // Soundscape layers carry a harmonic pitch shift applied via
+      // [AudioEngine.setPitchShift]. Reconstruct them as [SoundscapeSource] so
+      // the shift survives the snapshot — a plain [SampleSource] would drop it
+      // and the layer would revert to unshifted playback for the sleep timer's
+      // duration. Pitch is read from the live layer, mirroring how the
+      // tone/binaural branches above preserve their own parameters.
+      if (l.assetPath.contains('soundscapes/')) {
+        return SoundscapeSource(
+          assetPath: l.assetPath,
+          volume: vol,
+          pitchShiftRatio: l.pitchShiftRatio,
+          // The engine layer does not track the tonal root; rootFrequency is
+          // metadata only and is not read on the sleep-timer reload path
+          // (_loadWaypoint applies pitchShiftRatio, never rootFrequency), so a
+          // neutral placeholder is sufficient here.
+          rootFrequency: 0.0,
+        );
+      }
       return SampleSource(assetPath: l.assetPath, volume: vol);
     }
 

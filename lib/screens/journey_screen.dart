@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/journey.dart';
 import '../services/audio_engine.dart';
 import '../services/journey_engine.dart';
+import '../services/motif_engine.dart';
 
 // ─── Duration quick-pick helpers ─────────────────────────────────────────────
 
@@ -254,11 +255,13 @@ const List<Journey> _kJourneys = [
 class JourneyScreen extends StatefulWidget {
   final AudioEngine audioEngine;
   final JourneyEngine journeyEngine;
+  final MotifEngine motifEngine;
 
   const JourneyScreen({
     super.key,
     required this.audioEngine,
     required this.journeyEngine,
+    required this.motifEngine,
   });
 
   @override
@@ -304,12 +307,20 @@ class _JourneyScreenState extends State<JourneyScreen> {
 
   Future<void> _startSleepTimer() async {
     if (widget.audioEngine.layers.isEmpty) return;
-    final journey =
-        Journey.sleepTimer(widget.audioEngine, _sleepTimerDuration);
+    // Pass the live MotifEngine so any running motifs are snapshotted into the
+    // sleep-timer journey and faded to silence with the rest of the mix. It
+    // goes to both Journey.sleepTimer (which builds the fading MotifSource) and
+    // journeyEngine.start (which drives the density interpolation).
+    final journey = Journey.sleepTimer(
+      widget.audioEngine,
+      _sleepTimerDuration,
+      motifEngine: widget.motifEngine,
+    );
     await widget.journeyEngine.start(
       journey,
       widget.audioEngine,
       _sleepTimerDuration,
+      motifEngine: widget.motifEngine,
     );
   }
 

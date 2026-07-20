@@ -176,6 +176,7 @@ class _MainShellState extends State<MainShell> {
       JourneyScreen(
         audioEngine: _audioEngine,
         journeyEngine: _journeyEngine,
+        motifEngine: _motifEngine,
       ),
     ];
   }

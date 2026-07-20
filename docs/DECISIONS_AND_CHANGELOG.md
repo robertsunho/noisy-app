@@ -11,6 +11,14 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 
 ## DECISIONS
 
+### D-008 — Sleep-timer defects (#10) ruled bugs, not design — both fixed
+**Date:** 2026-07-20
+**Decision:** Ruling on audit #10, both halves. (A) `Journey.sleepTimer` accepts a `motifEngine` and builds a `MotifSource` fading density to 0, but its only call site (`journey_screen.dart` `_startSleepTimer`) never passed one — so motifs kept firing at full density after the mix faded to silence. (B) `toSource()` reconstructed soundscape layers as plain `SampleSource`, dropping `pitchShiftRatio` so the layer reverted to unshifted playback for the timer's duration. **Both are ruled genuine bugs — the feature does not work as designed — and both are fixed now**, not deferred.
+**Why bugs-not-design:** The intent is unambiguous in each case. The `motifEngine` parameter exists *precisely* to fade motifs; leaving it unpassed is an unwired call site, not a design choice. `SoundscapeSource` exists *precisely* because pitch matters; reconstructing it as `SampleSource` silently discards the harmonic tuning the whole engine is built to produce. Neither reading survives contact with the code's own structure.
+**Reinforced by product direction:** The ruling was strengthened by an emerging product axis (`PRODUCT_DESIGN.md` §3.7, LP / Radio): bounded, *ending* experiences are becoming **more** central to the product, not less. A sleep-timer-like ending is subsumed by the "LP" form (an ending built into the object). Fixing the ending's mechanics now — motifs actually resolve, pitch actually survives — invests in a direction the product is moving toward, which tips a close "fix now vs. defer" call toward fix now.
+**Scope discipline:** Surgical fixes only. No fade durations, curves, or timing changed; `harmonic_matcher.dart` untouched. `rootFrequency` on the reconstructed `SoundscapeSource` is defaulted (the engine layer does not track per-layer root, and it is inert on the sleep-timer reload path, which applies only `pitchShiftRatio`).
+**References:** Audit item #10; ruling R-10; `PRODUCT_DESIGN.md` §3.7.
+
 ### D-007 — `addLayer` gains an optional volume target; journey-engine passing real targets deferred to V2
 **Date:** 2026-07-20
 **Decision:** Ruling on audit #4 (paired with #27). The hardcoded 0.7 in `AudioEngine.addLayer` is **retained as the default**, but `addLayer` gains an optional `volume:` named parameter (clamped [0.0, 1.0]) so it can express "add this layer at this volume" — matching how `addToneLayer` / `addBinauralLayer` already honor a `volume:` target. This is a capability-adding, behavior-preserving change: with the default in place, every existing call site (journey engine, mixer screen, library screen) behaves identically to today. #27's comment is corrected in the same change to describe the real preload/interpolation sequence.
@@ -54,6 +62,11 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 ---
 
 ## CHANGELOG
+
+### C-007 — Sleep timer fades motifs and preserves pitch (Bucket C: R-10)
+**Date:** 2026-07-20
+**Change:** Fixed both defects in audit #10 per ruling D-008. **Fix A (motifs):** `JourneyScreen` gained a `motifEngine` field (wired from `main.dart`'s `_motifEngine`), and `_startSleepTimer` now passes it to both `Journey.sleepTimer(...)` (which builds the fading `MotifSource`) and `journeyEngine.start(...)` (which drives the density interpolation). Previously the call site passed neither, so motifs kept firing after the mix faded out. **Fix B (pitch):** `Journey.sleepTimer`'s local `toSource()` now reconstructs soundscape layers (detected by the `soundscapes/` asset path) as `SoundscapeSource`, reading `pitchShiftRatio` from the live `AudioLayer` so the harmonic pitch shift survives the snapshot; previously they became plain `SampleSource` and reverted to unshifted playback. `rootFrequency` is defaulted — the engine layer does not carry it and it is unused on the reload path. No fade durations, curves, or timing changed; `harmonic_matcher.dart` untouched. `flutter analyze`: no issues. Recorded the LP/Radio product axis in `PRODUCT_DESIGN.md` §3.7; checked off #10 in ROADMAP Bucket C.
+**Reference:** Decision D-008; ruling R-10; audit item #10.
 
 ### C-006 — `addLayer` accepts optional volume target (Bucket C: R-04, R-27)
 **Date:** 2026-07-20
@@ -125,3 +138,4 @@ Design-flavored rulings that carry behavioral/product consequences. Ruled with a
 
 - **R-04** — code capability gap — `addLayer` gained an optional `volume:` target (default 0.7); behavior unchanged. `AudioEngine.addLayer` now mirrors `addToneLayer`/`addBinauralLayer` by accepting a `volume:` named parameter, clamped [0.0, 1.0] and routed through the existing 1.5s `_startFade`. The 0.7 default preserves every current call site's behavior; having the journey engine pass real targets was considered and deferred to V2. See D-007.
 - **R-27** — code comment stale — corrected to match behavior — paired with #4. The `_loadWaypoint` docstring and inline comment asserted layers preload at volume 0, contradicted by the 0.7 `addLayer` fade for sample/soundscape layers. Rewrote both to describe the real sequence: tone/binaural preload at 0; sample/soundscape begin fading toward 0.7 and are pinned by `_applyInterpolation`'s first `setVolume` tick (which cancels the fade). Preload logic unchanged — comment only.
+- **R-10** — code bug — both defects fixed: motif engine now wired at the sleep-timer call site; `toSource()` preserves soundscape pitch shift. (A) `JourneyScreen` now holds a `MotifEngine` (injected from `main.dart`) and `_startSleepTimer` passes it to both `Journey.sleepTimer` and `journeyEngine.start`, so running motifs fade to silence with the mix instead of firing on after the fade. (B) `toSource()` reconstructs soundscape layers as `SoundscapeSource` with `pitchShiftRatio` read from the live layer, preserving harmonic tuning across the snapshot (`rootFrequency` defaulted — not tracked per-layer, inert on the reload path). Surgical: no timing/curve changes, `harmonic_matcher.dart` untouched. Ruled bug-not-design and reinforced by the emerging LP/Radio product axis — see D-008 and `PRODUCT_DESIGN.md` §3.7.
