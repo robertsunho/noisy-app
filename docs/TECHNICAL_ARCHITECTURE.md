@@ -100,15 +100,35 @@ Interpolates between mixer states (waypoints) over a duration. States: stopped, 
 
 Generates a soundscape mix from an (energy, focus, warmth) input.
 
-**Category inference** *(audit #5 — code's actual thresholds; doc v2.4 was wrong. Whether these thresholds are the intended design is an open Bucket-C ruling.)*:
-```
+**Category inference** (`_inferCategory`) — *(audit #5, ruled R-05: this is the behavior of record; doc v2.4's thresholds matched nothing in the code and assigned the code's Relax region to Meditate. Thresholds are deliberately **not** retuned — the taxonomy is expected to be replaced rather than retuned in V2; see D-010 and `PRODUCT_DESIGN.md` §3.8.)*
+
+A sequence of guards, **first match wins** — order is behavioral, not cosmetic:
+
+| # | Condition | Category |
+|---|---|---|
+| 1 | `energy < 0.25 && focus < 0.30` | `Sleep` |
+| 2 | `focus > 0.65` | `Focus` |
+| 3 | `energy > 0.65` | `Energize` |
+| 4 | `energy < 0.35 && warmth > 0.50` | `Relax` |
+| 5 | `focus > 0.45` | `Meditate` |
+| 6 | *(fallthrough)* | `Relax` |
+
+```dart
 if (energy < 0.25 && focus < 0.30) return 'Sleep';
-if (focus  > 0.65)                 return 'Focus';
-if (energy > 0.65)                 return 'Energize';
+if (focus  > 0.65)                  return 'Focus';
+if (energy > 0.65)                  return 'Energize';
 if (energy < 0.35 && warmth > 0.50) return 'Relax';
-if (focus  > 0.45)                 return 'Meditate';
+if (focus  > 0.45)                  return 'Meditate';
 return 'Relax';
 ```
+
+Consequences of the ordering worth knowing before reasoning about a slider position:
+- **`Relax` is reachable two ways** — rule 4 (low energy + warm) and rule 6 (everything unmatched). It is both a specific region *and* the default.
+- **`Meditate` is a narrow residue.** It needs `focus` in `(0.45, 0.65]` *and* to have escaped rules 1, 3 and 4 — so warm low-energy inputs become `Relax` (rule 4) before `Meditate` is ever tested.
+- **`warmth` participates in exactly one rule** (4). It has no influence anywhere else in category inference.
+- **Rules 2 and 3 precede rule 4**, so high `focus` or high `energy` wins over the warmth rule regardless of warmth.
+
+Category drives motif palette, motif density, journey name, and journey icon.
 
 **5-slot selection** (`_selectByCategory`), volumes from Remote Config *(audit #7 — not hardcoded constants)*:
 1. **Frequency** resolved first (so it can inform soundscape selection) — `frequency_volume` (default 0.30), skip if distance > 1.2
@@ -119,9 +139,25 @@ return 'Relax';
 
 **Determinism note (external eval §2 #3):** `generateMix` is pure argmax — the same slider position yields the identical mix (only motif randomness differs). Candidate for weighted top-k selection; tracked in `ROADMAP.md` Phase 3 as it serves the ephemerality thesis.
 
-**Motif density** (`_inferMotifDensity(category)`) reads Remote Config per category — a flat value, not energy-scaled *(audit #6)*: `motif_density_sleep` 0.25, `motif_density_focus` 0.40, `motif_density_energize` 0.70, `motif_density_relax` 0.40 (Meditate falls through to relax).
+**Motif density** (`_inferMotifDensity(category)`) reads Remote Config per category — a flat point value, **not** energy-scaled *(audit #6)*:
 
-**Journey generation:** 3 waypoints, easeInOut. Two behaviors not in doc v2.4 *(audit #8)*: waypoint 1 perturbs layers by ±0.05 (clamped [0.10, 0.70]); waypoint 2 drops motif density to a hardcoded 0.1 for Sleep (not RC-driven). Both are open Bucket-C rulings.
+| Category | Remote Config key | Default (`main.dart`) |
+|---|---|---|
+| `Sleep` | `motif_density_sleep` | 0.25 |
+| `Focus` | `motif_density_focus` | 0.40 |
+| `Energize` | `motif_density_energize` | 0.70 |
+| `Relax` | `motif_density_relax` | 0.40 |
+| `Meditate` | *(none — see below)* | 0.40 |
+
+> **`Meditate` has no dedicated density and inherits `Relax`'s** *(audit #6, ruled R-06)*. There is **no `motif_density_meditate` Remote Config key**; the switch in `_inferMotifDensity` cases only `Sleep` / `Energize` / `Focus`, so `Meditate` reaches `default:` and reads `motif_density_relax`. This is the current behavior of record — the key was deliberately **not** added, because the category taxonomy is expected to be replaced rather than retuned in V2 (D-010, `PRODUCT_DESIGN.md` §3.8). Consequence: tuning `motif_density_relax` remotely moves Meditate too; the two categories cannot be separated without a code change.
+
+**Journey generation** (`generateJourney`) — 3 waypoints, `easeInOut` curves (weights 0 / 1.0 / 1.0). Two behaviors were absent from doc v2.4 and are **documented here as intended current behavior** *(audit #8, ruled R-08)*:
+
+- **Waypoint 0 — baseline.** Each recommendation at its Remote Config volume; motif layer (if the palette is non-empty) at the category density, layer volume 0.3.
+- **Waypoint 1 — mid-journey variation.** Each layer's volume is perturbed by **±0.05 on alternating indices** (even index `+0.05`, odd `−0.05`) and **clamped to `[0.10, 0.70]`**. Motif density is unchanged. This is a deliberate slight drift so the middle of a journey is not a static hold of waypoint 0.
+- **Waypoint 2 — settle, with a Sleep taper.** Layer volumes return to their waypoint-0 values. Motif density returns to the category density **except for `Sleep`, where it drops to a hardcoded `0.1`** (`final wp2Density = category == 'Sleep' ? 0.1 : motifDensity;`) — so a sleep journey thins out toward its end rather than holding density to the finish.
+
+> **Known Remote Config inconsistency (documented exception, not a pattern to copy).** The Sleep waypoint-2 density of `0.1` is the one motif density in the system that is **not** Remote-Config-driven — it is a literal in `generateJourney`, unreachable by remote tuning, unlike every `motif_density_*` value above. This contradicts `ENGINEERING_PRINCIPLES.md` rule 4. It is ruled intended-for-now and left in place under R-08 rather than promoted to a key, on the same reasoning as R-05/R-06 (the category system itself is slated for replacement, D-010). **Do not replicate this shape in new code**; new densities and layer volumes route through Remote Config.
 
 ### 3.5 Harmonic Matcher (`harmonic_matcher.dart`)
 

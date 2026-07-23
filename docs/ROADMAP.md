@@ -40,7 +40,7 @@ Fast. Correct the design doc / new canonical docs to match the code.
 - [x] #22 — §13.3 says 9 solfeggio frequencies; catalog has 10 (432 Hz omitted)
 - [x] #23 — §13.9 names `mood_profiles.dart`; actual file is `mood_profile.dart` (singular)
 - [x] #7 — §4.4 presents 5 layer volumes as constants; they are Remote Config reads (numbers match defaults)
-- [x] #6 — §4.4 "density scales with energy" describes interpolation the code doesn't do (values match RC defaults). *Rule after #5 — same Meditate/Relax density thread.*
+- [x] #6 — §4.4 "density scales with energy" describes interpolation the code doesn't do (values match RC defaults). *Bucket A half closed in R-06; the deferred Meditate/Relax density thread ruled with #5 — R-06 (D-010): Meditate's fallthrough to `motif_density_relax` documented in `TECHNICAL_ARCHITECTURE.md` §3.4; no `motif_density_meditate` key added.*
 
 ### Bucket B — Code-comment / intra-code fixes (code's own comments contradict code)
 Fast. Update stale comments/docstrings in the code.
@@ -54,8 +54,8 @@ Slow. These are latent bugs or design decisions. Some may be *promoted* into the
 
 - [x] #4 — `addLayer` fades to hardcoded 0.7, not "to target" as doc claims. *Ruled R-04 (D-007): 0.7 retained as default; `addLayer` gained an optional `volume:` target so it can honor a target like tones do. Behavior unchanged — journey-engine passing real targets deferred to V2.*
 - [x] #27 — `_loadWaypoint` comment asserts layers preload at volume 0; sample/soundscape layers actually fade to 0.7 via `addLayer`. *Ruled R-27: comment corrected to describe the real preload/interpolation sequence; paired with #4.*
-- [ ] #5 — mood→category thresholds in doc match nothing in code; doc's Meditate rule is code's Relax rule. *Ruling needed: are the code's current thresholds the intended design, or did they drift? Affects which journey whole slider regions produce.*
-- [ ] #8 — undocumented behaviors: ±0.05 waypoint perturbation; hardcoded Sleep density 0.1 (not RC-driven). *Ruling: document as intended, or reconsider?*
+- [x] #5 — mood→category thresholds in doc match nothing in code; doc's Meditate rule is code's Relax rule. *Ruled R-05 (D-010): doc reconciled to code — the code's thresholds are the behavior of record, documented in evaluation order in `TECHNICAL_ARCHITECTURE.md` §3.4. No threshold changed: the outcome-named taxonomy is expected to be replaced, not retuned, in V2 (`PRODUCT_DESIGN.md` §3.8), so tuning now is work the overhaul subsumes.*
+- [x] #8 — undocumented behaviors: ±0.05 waypoint perturbation; hardcoded Sleep density 0.1 (not RC-driven). *Ruled R-08 (D-010): both documented as intended current behavior in §3.4. The hardcoded 0.1 is flagged there as a documented exception to `ENGINEERING_PRINCIPLES.md` rule 4 — not a pattern to copy. No code change.*
 - [x] #10 — `Journey.sleepTimer` motif support never wired at its only call site; motifs keep firing after sleep-timer fade. Also: `toSource()` drops pitch-shift on snapshot. *Ruled R-10 (D-008): both are bugs, both fixed — call site now passes the live MotifEngine (motifs fade with the mix); `toSource()` reconstructs soundscape layers as `SoundscapeSource`, preserving pitch shift.*
 - [x] #15 — `piano_note_f` and `gourd_percussion` lost tags in code; `piano_note_f` can never be selected for Sleep/Meditate despite doc. *Ruled R-15 (D-009): restored the missing tags — piano_note_f regains `meditate`/`sleep`, gourd_percussion regains `meditate`. Provisional stopgap; tag taxonomy expected to be reworked in V2.*
 - [x] #14 — seven motifs carry more tags in code than doc (code is superset). *Ruled R-14 (D-009): code's broader tagging accepted as intended; `CONTENT_PRODUCTION.md` §3 updated to match.*

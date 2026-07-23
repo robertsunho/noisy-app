@@ -78,6 +78,20 @@ Why this may be the right spine:
 
 This axis is compatible with, and may reframe, the input/output frontiers above (§3.1–3.2): choosing "an LP" vs. "the Radio" is itself a present-tense, human-legible way to say what you want right now.
 
+### 3.8 Category taxonomy (to be replaced)
+> **Status: emerging — a direction, not a settled design.** Recorded as the product rationale behind Decision **D-010**; the shape below is not yet committed to.
+
+The engine's five categories — **Sleep / Focus / Energize / Relax / Meditate** (`TECHNICAL_ARCHITECTURE.md` §3.4) — are **outcome labels**: each names a result the sound is implicitly promising to produce. That is inherited vocabulary from the wellness-utility framing this product is deliberately exiting (§2: *musical, not medical*; closer to a generative Eno record than to a Calm/Headspace utility). A category system built on promised outcomes pulls the product back toward the lane it is trying to leave, and toward exactly the therapeutic claims §2 flags as both unsupportable and store-risky.
+
+So the expectation is that these categories are **replaced, not retuned**. Two different fates are emerging along the LP / Radio axis (§3.7):
+
+- **Radio may keep a curated vocabulary — but of moments and places, not outcomes.** Names like *Dawn*, *Deep Work*, *Night Rain* do real work on a continuous, lean-back surface: they let a person tune in to something already playing without first describing themselves. And they serve the wellness use cases perfectly well — someone who wants to fall asleep recognizes *Night Rain* — **without the product making a wellness claim**. The moment is offered; the outcome is left to the listener.
+- **LP may abandon categories entirely.** A commissioned, personal, bounded piece is the wrong thing to route through a fixed set of preset labels. Forcing it through five buckets reproduces the same **"frustrating middle-ground"** problem identified for the sliders in §3.1 — too coarse to be personal, too abstract to be intuitive — at exactly the moment the product is claiming to be most personal.
+
+**Consequence:** the category system may **survive on the Radio side and disappear on the LP side**. That is a structural change to how generation is addressed, not a renaming exercise — the two surfaces would no longer share one selection vocabulary.
+
+**Therefore threshold tuning is deliberately deferred.** Retuning the `_inferCategory` thresholds, or adding the missing `motif_density_meditate` key, would be work the overhaul subsumes — investment in a taxonomy expected not to survive. The current thresholds and the Meditate density fallthrough are documented as the behavior of record instead (rulings R-05, R-06, R-08; Decision D-010).
+
 ---
 
 ## 4. Core Experience (current intended flow, engine-level)
