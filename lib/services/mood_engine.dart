@@ -102,7 +102,8 @@ class MoodEngine {
         if (p != null) {
           final carrierHz = (soundscapeRootHz != null && solfeggioFreq != null)
               ? HarmonicMatcher.findBinauralCarrier(
-                      soundscapeRootHz, solfeggioFreq)
+                      soundscapeRootHz, solfeggioFreq,
+                      beatFrequencyHz: p.$2)
                   .carrierHz
               : p.$1;
           return BinauralSource(
