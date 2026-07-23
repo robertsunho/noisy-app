@@ -8,9 +8,16 @@ import '../services/storage_service.dart';
 
 // ─── Category constants ───────────────────────────────────────────────────────
 
-const _kCategoryOrder = ['nature', 'noise', 'frequencies', 'binaural'];
+const _kCategoryOrder = [
+  'soundscape',
+  'nature',
+  'noise',
+  'frequencies',
+  'binaural',
+];
 
 const _kCategoryLabels = {
+  'soundscape': 'Soundscapes',
   'nature': 'Nature',
   'noise': 'Noise',
   'frequencies': 'Frequencies',
@@ -18,6 +25,7 @@ const _kCategoryLabels = {
 };
 
 const _kCategoryIcons = <String, IconData>{
+  'soundscape': Icons.landscape_rounded,
   'nature': Icons.park_rounded,
   'noise': Icons.waves_rounded,
   'frequencies': Icons.graphic_eq_rounded,

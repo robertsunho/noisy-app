@@ -39,6 +39,7 @@ All canonical docs live in `/docs` (root = canonical only; `docs/audits/` = inve
 - **Commit discipline:** stage only what the task asks for. Leave unrelated working-tree churn (`pubspec.lock`, `gradle.properties`, generated plugin files) untouched unless told otherwise.
 - **Git identity** is set repo-locally and globally as Robert Sunho <robertsunho@gmail.com>. If a commit fails on missing identity, that's the thing to check.
 - **Commit + push** after completing a discrete task, with a clear message. Reference doc IDs (D-/C-/R-) where relevant.
+- **Windows shell caution:** on this setup, shell-based text manipulation keeps misfiring (tree-mangling empty replacements, a silent `perl -i` no-op, a PowerShell here-string embedded literally in a commit message) — prefer the Edit/str_replace tooling over `sed`/`perl -i`, and write commit messages with a single-line `-m` or `-F <file>` rather than a multi-line shell string.
 - **When in doubt near the engine, stop and ask** rather than proceeding. A recorded five-minute discussion beats silently re-breaking hard-won audio behavior.
 
 ## Current phase
