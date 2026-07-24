@@ -2,8 +2,8 @@
 
 Forward-looking plan for Noisy. Claude Code marks items complete (`[x]`) as work lands, with a Changelog entry for each. Ordered by phase; phases are sequenced but not time-boxed.
 
-**Last updated:** July 17, 2026
-**Current phase:** Phase 2 — Infrastructure & Reconciliation
+**Last updated:** July 24, 2026
+**Current phase:** Phase 3 — Product Reimagining (Phase 2 complete)
 
 ---
 
@@ -19,9 +19,11 @@ Forward-looking plan for Noisy. Claude Code marks items complete (`[x]`) as work
 
 ---
 
-## Phase 2 — Codebase / Design-Doc Reconciliation (the 29 discrepancies)
+## Phase 2 — Codebase / Design-Doc Reconciliation (the 29 discrepancies) *(complete)*
 
 Each discrepancy from `AUDIT_REPORT.md` is triaged into one of three buckets (per Decision D-003). Rule each, record the ruling in `DECISIONS_AND_CHANGELOG.md`, then apply the fix.
+
+> **Phase 2 complete — 2026-07-24.** All **29 discrepancies are resolved**: Bucket A 15/15, Bucket B 3/3, Bucket C 11/11. Every item carries a recorded ruling (`R-01`–`R-29`) in `DECISIONS_AND_CHANGELOG.md`, and the design-flavored ones a decision (`D-007`–`D-013`). Outcome split: the majority reconciled **documentation to code** with no behavior change; **five code changes** landed (R-04 `addLayer` volume target, R-10 sleep-timer motif fade + pitch preservation, R-15 restored motif tags, R-18 soundscapes in Browse All, R-28 beta/gamma carrier range); **two items were promoted to V2** (R-17 Mixer catalog, R-29 curated journeys — see Phase 3 and Phase 4 below). Two threads carry forward into the V2 work rather than closing here: R-28 is **unvalidated on hardware** and needs an A/B in the V2 audio pass, and the category taxonomy (R-05/R-06) is documented as-is pending replacement. The correctness pass is concluded; strategic/V2 work now begins (D-002).
 
 ### Bucket A — Trivial doc fixes (doc wrong, code right; no judgment needed)
 Fast. Correct the design doc / new canonical docs to match the code.
@@ -59,12 +61,12 @@ Slow. These are latent bugs or design decisions. Some may be *promoted* into the
 - [x] #10 — `Journey.sleepTimer` motif support never wired at its only call site; motifs keep firing after sleep-timer fade. Also: `toSource()` drops pitch-shift on snapshot. *Ruled R-10 (D-008): both are bugs, both fixed — call site now passes the live MotifEngine (motifs fade with the mix); `toSource()` reconstructs soundscape layers as `SoundscapeSource`, preserving pitch shift.*
 - [x] #15 — `piano_note_f` and `gourd_percussion` lost tags in code; `piano_note_f` can never be selected for Sleep/Meditate despite doc. *Ruled R-15 (D-009): restored the missing tags — piano_note_f regains `meditate`/`sleep`, gourd_percussion regains `meditate`. Provisional stopgap; tag taxonomy expected to be reworked in V2.*
 - [x] #14 — seven motifs carry more tags in code than doc (code is superset). *Ruled R-14 (D-009): code's broader tagging accepted as intended; `CONTENT_PRODUCTION.md` §3 updated to match.*
-- [ ] #17 — Mixer has its own separate 25-entry catalog: no soundscape is reachable from the Mixer, binaural/frequency are served as MP3 samples (not synthesis), and it is a second hand-maintained catalog. *Ruling: is the soundscape-less, samples-not-synthesis Mixer intended, or a gap to close?*
+- [x] #17 — Mixer has its own separate 25-entry catalog: no soundscape is reachable from the Mixer, binaural/frequency are served as MP3 samples (not synthesis), and it is a second hand-maintained catalog. *Ruled R-17 (D-013): architectural smell, **→ promoted to V2 (see roadmap Phase 3)** — not fixed now because the Mixer surface is within the scope of the V2 navigation/IA reorganization, and the fix is a rebuild rather than a correction. The MP3-vs-synthesis half is separable and could be pulled forward if audio quality warrants.*
 - [x] #18 — Library "Browse All" advertises 43 sounds but renders 33 (`'soundscape'` missing from `_kCategoryOrder`; no label/icon keys either). Code bug. *Ruled R-18 (D-011): Option A — added `'soundscape'` to all three category maps, leading the browse order. All 43 entries now render across five categories; the advertised count is unchanged and correct.*
 - [x] #28 — beta/gamma carrier range: `beatFrequencyHz` param built but not passed from `mood_engine.dart` call site. *Ruled R-28 (D-012): wired — the call site now passes `beatFrequencyHz: p.$2`, activating the 200–400 Hz range for beta/gamma. Deliberate audible change to Focus/Energize mixes; **unvalidated on hardware** — A/B it during the V2 audio pass alongside mix-glue and MotifEngine density.*
-- [ ] #29 — curated journeys still use legacy `SampleSource` MP3s, bypassing the harmonic system. *First-impression issue: "curated" showcase hears the old product. Promote to V2?*
+- [x] #29 — curated journeys still use legacy `SampleSource` MP3s, bypassing the harmonic system. *Ruled R-29 (D-013): legacy surface, **→ promoted to V2 (see roadmap Phase 4)** — not fixed now because curated journeys are expected to be replaced by the LP/Radio restructure (`PRODUCT_DESIGN.md` §3.7), so re-authoring them against the current engine is work the restructure subsumes. Accepted cost: the first-impression problem (§3.6) persists through the V2 design period.*
 
-> **Note:** All 29 discrepancies are now bucketed — A = 15, B = 3, C = 11. Triage corrected per Decision **D-006** (see Changelog **C-003**).
+> **Note:** All 29 discrepancies are now bucketed — A = 15, B = 3, C = 11 — and all 29 are now **ruled and closed**. Triage corrected per Decision **D-006** (see Changelog **C-003**); bucket completion recorded in **C-012**.
 
 ---
 
@@ -81,11 +83,17 @@ Known raw material to work into this phase:
 - [ ] "Glue" for the mix: candidate new engine capability (shared reverb / bus processing / master limiting) to make layers cohere (Robert's re-engagement note)
 - [ ] MotifEngine density redesign: prime-number system yields clumpy/sparse distribution, not steady organic density with a frequency hierarchy (Robert's re-engagement note)
 
+Promoted from Phase 2 Bucket C (see D-013):
+- [ ] **Unify the Mixer onto `sound_meta.dart`** (retire the separate ~25-entry Mixer catalog); **make soundscapes reachable in the Mixer**; **serve binaural/frequency via real-time synthesis, not MP3** *(ref R-17 / #17)*. Sits in Phase 3 because the Mixer's shape is decided by the navigation/IA reorganization above — design that first, then build the unified surface against it. **Separable sub-issue:** the MP3→synthesis half needs neither the catalog merge nor the Mixer rebuild and can be pulled forward on its own if manual testing shows the sampled binaural/frequency layers are audibly worse (they cannot be pitched to the mix's key).
+
 ---
 
 ## Phase 4 — V2 Build
 
 Concrete implementation of the reimagined product on the preserved engine. Populated after Phase 3 design work. Will incorporate the external evaluation's prioritized launch blockers where they belong.
+
+Promoted from Phase 2 Bucket C (see D-013):
+- [ ] **Rebuild curated journeys on the current engine** — as **LP presets and/or Radio stations per `PRODUCT_DESIGN.md` §3.7** — so they no longer bypass the harmonic system *(ref R-29 / #29)*. Today all five use `SampleSource` MP3s across all 20 waypoints: no `SoundscapeSource`/`ToneSource`/`BinauralSource`/`MotifSource`, nothing pitched into key. **Blocks: first-impression integrity, `PRODUCT_DESIGN.md` §3.6** — until this lands, a first-time user sampling "Journey" hears the old, undifferentiated product. Implementation note: `_JourneyCard._layerNames` filters `.whereType<SampleSource>()`, so the card UI shows no layer chips for any migrated journey and must be updated alongside. Depends on the Phase 3 LP/Radio ruling — build only after it is settled whether these become presets, stations, or are dropped.
 
 Launch-blocker candidates from external evaluation (to be scheduled here or earlier as ruled):
 - [ ] **Background/lock-screen audio** + validate journey/motif timing under background execution (external eval §2 #1). *May need to move earlier — see D-004. Structural, affects preserved engine.*
