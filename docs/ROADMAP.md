@@ -4,6 +4,7 @@ Forward-looking plan for Noisy. Claude Code marks items complete (`[x]`) as work
 
 **Last updated:** July 24, 2026
 **Current phase:** Phase 3 — Product Reimagining (Phase 2 complete)
+**Open validation debt:** see [Needs hardware validation](#needs-hardware-validation) — R-28 carrier change and the D-014 background-audio predictions both await one device pass.
 
 ---
 
@@ -70,6 +71,16 @@ Slow. These are latent bugs or design decisions. Some may be *promoted* into the
 
 ---
 
+## Needs hardware validation
+
+Claims accepted into the canonical docs that have **not** been checked on a real device. Emulators and Chrome are not adequate for any of these (`ENGINEERING_PRINCIPLES.md` — audio is judged on Android, never Chrome). These share **one device pass**; do it before the V2 audio work depends on them.
+
+- [ ] **Beta/gamma binaural carrier range** (R-28 / D-012) — the 200–400 Hz carrier is now active for beta/gamma beats, a deliberate audible change to Focus/Energize mixes (e.g. C4 root + 528 Hz: 98 Hz → 392 Hz). **A/B by ear**, alongside the mix-glue and MotifEngine-density work. If wrong, reverting is a one-argument change.
+- [ ] **Background-audio behavior** (D-014) — the Track A / Track B decomposition is reasoned from code, plugin manifests, and platform contracts, **not measured**. Specifically unverified: how fast Android freezes or kills the process without a foreground service (and how much worse aggressive OEM power management is); **whether SoLoud `SoundHandle`s survive an iOS audio interruption** — `ToneService` stores handles with no revalidation path, so if they don't, every tone and binaural layer becomes a silent no-op the app still reports as playing; whether a stall partway through `AudioEngine`'s crossfade is reachable in practice (listen for phasey doubling at loop boundaries); and whether `Stopwatch`'s monotonic clock stalls under deep device sleep, which would make a 30-minute sleep timer run long.
+- [ ] **iOS generally** — `TECHNICAL_ARCHITECTURE.md` §1 records iOS as unvalidated. Expect background audio to fail there immediately and reproducibly until Track A lands.
+
+---
+
 ## Phase 3 — Product Reimagining (design, not yet build)
 
 Vision-first redesign of the product layer, driven by `PRODUCT_DESIGN.md`. Synthesizes: Robert's re-engagement observations, the external evaluation, and promoted Bucket-C rulings.
@@ -82,6 +93,8 @@ Known raw material to work into this phase:
 - [ ] Positioning: de-emphasize solfeggio/binaural mysticism; lead with "musical, not medical" / "humanly crafted, harmonically coherent" (external eval §3, §4)
 - [ ] "Glue" for the mix: candidate new engine capability (shared reverb / bus processing / master limiting) to make layers cohere (Robert's re-engagement note)
 - [ ] MotifEngine density redesign: prime-number system yields clumpy/sparse distribution, not steady organic density with a frequency hierarchy (Robert's re-engagement note)
+
+- [ ] **LP timeline on a clock-based reference** — design the shaped/timed experience so its timeline is driven by **wall-clock / audio-position elapsed time, reconciled on resume**, rather than by accumulated Dart `Timer` ticks (which the OS throttles in background). Per **D-014** this belongs *inside* the LP design rather than as a retrofit — a shaped experience should be authored against a clock reference from the start. Scope is narrower than it sounds: `JourneyEngine` already samples a `Stopwatch`, so position cannot drift; what needs solving is resume behavior (glide rather than snap), layer add/remove events skipped inside a stall, and `AudioEngine`'s tick-accumulated crossfade blend. *(Touches empirically-tuned crossfade timing → needs a recorded decision before the code changes; see `TECHNICAL_ARCHITECTURE.md` §6.)*
 
 Promoted from Phase 2 Bucket C (see D-013):
 - [ ] **Unify the Mixer onto `sound_meta.dart`** (retire the separate ~25-entry Mixer catalog); **make soundscapes reachable in the Mixer**; **serve binaural/frequency via real-time synthesis, not MP3** *(ref R-17 / #17)*. Sits in Phase 3 because the Mixer's shape is decided by the navigation/IA reorganization above — design that first, then build the unified surface against it. **Separable sub-issue:** the MP3→synthesis half needs neither the catalog merge nor the Mixer rebuild and can be pulled forward on its own if manual testing shows the sampled binaural/frequency layers are audibly worse (they cannot be pitched to the mix's key).
@@ -96,7 +109,7 @@ Promoted from Phase 2 Bucket C (see D-013):
 - [ ] **Rebuild curated journeys on the current engine** — as **LP presets and/or Radio stations per `PRODUCT_DESIGN.md` §3.7** — so they no longer bypass the harmonic system *(ref R-29 / #29)*. Today all five use `SampleSource` MP3s across all 20 waypoints: no `SoundscapeSource`/`ToneSource`/`BinauralSource`/`MotifSource`, nothing pitched into key. **Blocks: first-impression integrity, `PRODUCT_DESIGN.md` §3.6** — until this lands, a first-time user sampling "Journey" hears the old, undifferentiated product. Implementation note: `_JourneyCard._layerNames` filters `.whereType<SampleSource>()`, so the card UI shows no layer chips for any migrated journey and must be updated alongside. Depends on the Phase 3 LP/Radio ruling — build only after it is settled whether these become presets, stations, or are dropped.
 
 Launch-blocker candidates from external evaluation (to be scheduled here or earlier as ruled):
-- [ ] **Background/lock-screen audio** + validate journey/motif timing under background execution (external eval §2 #1). *May need to move earlier — see D-004. Structural, affects preserved engine.*
+- [ ] **Background/lock-screen audio — platform configuration for continuous playback** *(additive; no engine-logic changes)*. Android foreground service (`FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `mediaPlayback` service, notification); iOS `UIBackgroundModes: audio` + activated `AVAudioSession` playback category; wire `audio_session` (**already in the dependency tree** transitively via `just_audio` — present but never imported or configured) or adopt `audio_service`. Per **D-014** this is sufficient for continuous/Radio-style playback on its own: the native audio layer sustains sound without Dart timers. Also add a lifecycle observer — the app currently has none. *(external eval §2 #1; D-004 scoped by D-014.)*
 - [ ] SoLoud migration for true pitch-shift-without-tempo-change; may shrink the 144-soundscape target (external eval §2 #2)
 - [ ] Move Anthropic API call server-side (Cloud Function); stop bundling `.env` in the app (external eval §3)
 - [ ] Stop sending raw user mood-text to Firebase Analytics (external eval §3)
