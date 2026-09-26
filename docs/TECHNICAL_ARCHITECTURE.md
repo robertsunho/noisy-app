@@ -203,9 +203,10 @@ Five Firebase Analytics event wrappers, injected into `HomeScreen` and `MixerScr
 
 **SoundSource hierarchy:** `SampleSource`, `SoundscapeSource` (adds `pitchShiftRatio`, `rootFrequency`), `ToneSource`, `BinauralSource`, `MotifSource`. Gives the journey engine a uniform way to interpolate heterogeneous layers.
 
-**SavedMix / MixLayer:** persists `assetPath` / `name` / `volume` only.
-
-> ⚠ *Lossy-save concern (external eval §2 #4): pitch-shift ratios, tone/binaural frequency params, and motif state are **not** persisted. A mood-generated mix cannot faithfully round-trip; tone layers stored as semantic IDs like `tone:528` will fail if replayed through the sample-based `addLayer` path (`setAsset('tone:528')`), with no error handling in the chain. Fix before beta — `ROADMAP.md` Phase 4.*
+**SavedMix / MixLayer:** a **faithful snapshot** of the engine's layers (D-018). The saved format carries `version: 2`; each `MixLayer` records its `kind` (`sample` / `soundscape` / `tone` / `binaural`) plus `volume` and the parameters to rebuild it: `pitchShiftRatio` for soundscapes, `frequency` for tones, `carrierHz` + `beatHz` for binaural. `MixLayer.fromEngineLayer` snapshots a live `AudioLayer` (kind detection mirrors `Journey.sleepTimer`); `MixLayer.tryFromJson` parses per layer and returns null for an unknown kind or malformed data, so one bad layer is dropped rather than the whole mix. **Pre-v2 saves** (no version, no kind) still load: kind is inferred from the `tone:` / `binaural:` ID prefix or the `soundscapes/` folder; absent parameters get neutral defaults — pitch 1.0, frequency/beat parsed from the ID, binaural carrier 200 Hz (`legacyBinauralCarrierHz`). A present-but-non-numeric parameter is malformed and skips the layer. **Replay** (`LibraryScreen._playSavedMix`) dispatches by kind — `addToneLayer`, `addBinauralLayer`, `addLayer` + `setPitchShift`, or `addLayer` — each layer in its own `try`, so a failure is logged and skipped, not fatal.
+- **Known gap — motifs:** `MotifEngine` voices are not engine layers and are not saved; a mood-generated mix reloads without its motifs.
+- **Known gap — live frequency drift:** `AudioLayer.toneFreq` / `binCenterFreq` / `binBeatFreq` are `final`, set at add time; `setToneFrequency` / `setBinauralFrequencies` update `ToneService` but not those fields. A snapshot records the frequency the layer *started* with. Latent today (journey tone/binaural IDs are keyed by rounded frequency/beat, so values are effectively constant per layer), and the same limitation already applies to `Journey.sleepTimer`.
+- **Snapshot vs recipe** (mood input + seed) is a V2 LP decision (D-018); `version` exists so V2 can migrate saved data.
 
 ---
 

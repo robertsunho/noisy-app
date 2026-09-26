@@ -93,9 +93,30 @@ class LibraryScreenState extends State<LibraryScreen> {
     await Future.wait(existing.map(widget.engine.removeLayer));
     if (!mounted) return;
 
+    // Each layer is replayed through the engine method for its kind (D-018).
+    // A failure skips that layer and is logged, rather than aborting the load
+    // and leaving silence.
+    final engine = widget.engine;
     for (final layer in mix.layers) {
-      if (widget.engine.isFull) break;
-      await widget.engine.addLayer(layer.assetPath, layer.name);
+      if (engine.isFull) break;
+      try {
+        switch (layer.kind) {
+          case MixLayerKind.tone:
+            await engine.addToneLayer(
+                layer.assetPath, layer.name, layer.frequency!);
+          case MixLayerKind.binaural:
+            await engine.addBinauralLayer(layer.assetPath, layer.name,
+                layer.carrierHz!, layer.beatHz!);
+          case MixLayerKind.soundscape:
+            await engine.addLayer(layer.assetPath, layer.name);
+            engine.setPitchShift(layer.assetPath, layer.pitchShiftRatio);
+          case MixLayerKind.sample:
+            await engine.addLayer(layer.assetPath, layer.name);
+        }
+      } catch (e) {
+        debugPrint('Saved mix "${mix.name}": skipped layer '
+            '${layer.assetPath} (${layer.kind.name}): $e');
+      }
       if (!mounted) return;
     }
 

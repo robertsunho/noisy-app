@@ -78,6 +78,8 @@ Claims accepted into the canonical docs that have **not** been checked on a real
 - [ ] **Beta/gamma binaural carrier range** (R-28 / D-012) — the 200–400 Hz carrier is now active for beta/gamma beats, a deliberate audible change to Focus/Energize mixes (e.g. C4 root + 528 Hz: 98 Hz → 392 Hz). **A/B by ear**, alongside the mix-glue and MotifEngine-density work. If wrong, reverting is a one-argument change.
 - [ ] **Background-audio behavior** (D-014) — the Track A / Track B decomposition is reasoned from code, plugin manifests, and platform contracts, **not measured**. Specifically unverified: how fast Android freezes or kills the process without a foreground service (and how much worse aggressive OEM power management is); **whether SoLoud `SoundHandle`s survive an iOS audio interruption** — `ToneService` stores handles with no revalidation path, so if they don't, every tone and binaural layer becomes a silent no-op the app still reports as playing; whether a stall partway through `AudioEngine`'s crossfade is reachable in practice (listen for phasey doubling at loop boundaries); and whether `Stopwatch`'s monotonic clock stalls under deep device sleep, which would make a 30-minute sleep timer run long.
 - [ ] **iOS generally** — `TECHNICAL_ARCHITECTURE.md` §1 records iOS as unvalidated. Expect background audio to fail there immediately and reproducibly until Track A lands.
+- [ ] **Saved-mix reload** (D-018) — save and reload a mood-generated mix on device, and confirm tones, binaural and pitch are restored by ear.
+- [ ] **Live text-input generation** (D-017) — run one live text-input generation to confirm the model still responds and `themes` come back in the new format. The pinned model `claude-sonnet-4-20250514` may be subject to retirement. The feature fails silently (falls back to the sliders), so it must be checked deliberately.
 
 ---
 
@@ -114,7 +116,7 @@ Launch-blocker candidates from external evaluation (to be scheduled here or earl
 - [ ] Move Anthropic API call server-side (Cloud Function); stop bundling `.env` in the app (external eval §3) — *deferred to V2 per D-015; remains a hard launch blocker.*
 - [x] Stop sending raw user mood-text to Firebase Analytics (external eval §3) — *done 2026-09-25 (C-016, D-017): replaced by length, word count and vocabulary theme tags; mix-name save event now logs length only.*
 - [ ] Replace `com.example.*` placeholder app IDs; real release signing (external eval §3)
-- [ ] Saved mixes are lossy (don't round-trip pitch/tone/binaural params) (external eval §2 #4)
+- [x] Saved mixes are lossy (don't round-trip pitch/tone/binaural params) (external eval §2 #4) — *done 2026-09-25 (C-017, D-018): v2 snapshot format with per-layer kind and parameters; pre-v2 saves still load; per-layer safe replay. Motifs remain unsaved (known gap).*
 - [x] Unit tests for `HarmonicMatcher` (the crown jewel, currently one smoke test) (external eval §2 #5) — *done 2026-09-25 (C-014): table-driven suite in `test/harmonic_matcher_test.dart`, 89 tests, expectations derived from equal-temperament theory.*
 
 ---
@@ -126,6 +128,7 @@ Launch-blocker candidates from external evaluation (to be scheduled here or earl
   - [ ] Opt-in description sharing for testers: consent prompt; separate store without device ID; retention limit; privacy-policy disclosure (D-017).
   - [ ] *Candidate:* Satisfaction signals: regenerate-immediately, early abandon, listen duration, save.
 - [ ] Monetization + store prep
+  - [ ] Privacy policy discloses that mood descriptions are sent to an AI service for interpretation.
 - [ ] Marketing + launch
 
 ---

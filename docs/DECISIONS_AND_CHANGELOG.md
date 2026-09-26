@@ -11,6 +11,16 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 
 ## DECISIONS
 
+### D-018 — Saved mixes are faithful snapshots for now; snapshot-vs-recipe is a V2 LP decision
+**Date:** 2026-09-25
+**Decision:** A saved mix is a **faithful snapshot** of the engine's layers. Each layer records its kind (sample, soundscape, tone, binaural), its volume, and the parameters needed to rebuild it: pitch-shift ratio for soundscapes, frequency for tones, carrier and beat frequency for binaural. The saved format gains a schema **`version` field (2)**.
+**Why:** the previous format stored only `assetPath` / `name` / `volume`, so pitch, tone and binaural parameters were lost (external eval §2 #4). Worse, replaying a tone layer sent `tone:528` through the sample path (`setAsset` on a non-asset), which threw after the existing layers had already been removed — leaving the user in silence.
+**Backward compatibility:** saves without a version or kind still load. Kind is inferred from the ID prefix or the `soundscapes/` folder, and absent parameters get neutral defaults (pitch 1.0; the frequency encoded in the ID; binaural carrier 200 Hz, matching D-016's default fallback carrier, since pre-v2 saves never stored one).
+**Safe reload:** each layer is replayed through its own engine method inside its own `try`; a failure skips and logs that layer instead of aborting the load.
+**Explicitly deferred — snapshot vs recipe:** whether a saved mix should instead be a *recipe* (mood input + seed, regenerated on load) is a **V2 LP decision**. It will matter even more once generation stops being deterministic, when a recipe no longer reproduces what the user heard. The `version` field exists so V2 can migrate saved data whichever way that goes.
+**Motifs excluded:** `MotifEngine` voices are not engine layers and are not saved — a known gap. A mood-generated mix reloads without its motifs.
+**References:** external eval §2 #4; `TECHNICAL_ARCHITECTURE.md` §4; D-016; `PRODUCT_DESIGN.md` §3.7 (LP).
+
 ### D-017 — User-written text never goes to analytics; fixed-vocabulary theme tags carry the product insight instead
 **Date:** 2026-09-25
 **Decision:** No text a user wrote may be sent to analytics — not the mood description, not a mix name, not any future free-text field. Now a hard guardrail (`ENGINEERING_PRINCIPLES.md` rule 9).
@@ -143,6 +153,11 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 ---
 
 ## CHANGELOG
+
+### C-017 — Saved mixes round-trip all layer kinds (D-018)
+**Date:** 2026-09-25
+**Change:** **`saved_mix.dart`:** new `MixLayerKind` enum; `MixLayer` gains `kind`, `pitchShiftRatio`, `frequency`, `carrierHz`, `beatHz`; `MixLayer.fromEngineLayer(AudioLayer)` snapshots a live layer (same kind detection as `Journey.sleepTimer`); `MixLayer.tryFromJson` replaces `fromJson`, parsing per layer and returning null (layer skipped) for an unknown kind, a missing required field, a present-but-non-numeric parameter, or a non-positive/non-finite frequency; `SavedMix.toJson` writes `version: 2`. Pre-v2 layers infer kind from `tone:` / `binaural:` / `soundscapes/` and default absent parameters (pitch 1.0, ID-encoded frequency/beat, 200 Hz binaural carrier); a non-positive saved pitch ratio also falls back to 1.0. `storage_service.dart` unchanged — serialization stays in the model. **`mixer_screen.dart`:** save dialog uses `MixLayer.fromEngineLayer`. **`library_screen.dart`:** `_playSavedMix` dispatches by kind (`addToneLayer`, `addBinauralLayer`, `addLayer` + `setPitchShift`, `addLayer`), each layer wrapped in its own `try` with a `debugPrint` on failure; existing `if (!mounted) return` guards and the remove-then-add-then-fade sequence kept. No change to generation, the harmonic matcher, or audio timing. **`AudioLayer` parameter audit:** `volume`, `pitchShiftRatio`, `toneFreq`, `binCenterFreq`, `binBeatFreq` are all available. Not available: an explicit kind (inferred as above) and a soundscape's root frequency (not needed for replay). Also found: the tone/binaural frequency fields are `final` and not updated by `setToneFrequency` / `setBinauralFrequencies`, so a snapshot records the layer's starting frequency. That's latent today and shared with `Journey.sleepTimer`, and it's documented in §4, not fixed (it's engine code). **Tests:** new `test/saved_mix_test.dart`, 24 tests: round trip per kind and for a mixed mix, version/kind in the JSON, a pre-v2 fixture (soundscape, sample, `tone:528`, `binaural:6`, binaural MP3) including lossless re-save, ten malformed/unknown-kind layers each skipped while neighbours survive, and non-positive pitch → 1.0. `flutter test`: 166 passed. `flutter analyze`: no issues. **Docs:** `TECHNICAL_ARCHITECTURE.md` §4 lossy-save callout replaced; `ROADMAP.md` lossy-save item checked off, two "Needs hardware validation" items added (saved-mix reload by ear; live text-input generation / pinned-model check), and the AI-disclosure privacy-policy item added under Phase 5 store prep.
+**Reference:** Decision D-018; external eval §2 #4.
 
 ### C-016 — Theme tags replace user text in analytics (D-017)
 **Date:** 2026-09-25

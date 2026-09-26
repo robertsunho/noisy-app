@@ -256,11 +256,7 @@ class MixerScreenState extends State<MixerScreen> {
                           name: controller.text.trim(),
                           category: selectedCategory,
                           layers: _engine.layers
-                              .map((l) => MixLayer(
-                                    assetPath: l.assetPath,
-                                    name: l.name,
-                                    volume: l.volume,
-                                  ))
+                              .map(MixLayer.fromEngineLayer)
                               .toList(),
                           createdAt: DateTime.now(),
                         );
