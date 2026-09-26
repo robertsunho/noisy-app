@@ -11,6 +11,22 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 
 ## DECISIONS
 
+### D-020 — The design conversation reads the repo from GitHub; Project sync becomes once per conversation
+**Date:** 2026-09-25
+**Decision:** Claude in chat clones the public repo read-only and pulls before each review, instead of relying on Robert re-syncing the Project's GitHub source after every commit.
+**Why:** the Project connector has no auto-sync; the manual sync was per-commit friction and was sometimes forgotten, leaving reviews against stale code.
+**Consequence:** every commit must be pushed (`CLAUDE.md` working default). Robert still syncs once before starting a new conversation, since a fresh conversation starts from the Project copy.
+**Road not taken:** waiting for the connector to gain webhook auto-sync (anthropics/claude-ai-mcp issue #180, open).
+**References:** `CLAUDE.md` Working defaults; `SESSION_HANDOFF.md` start-of-conversation routine; D-005.
+
+### D-019 — Hardware validation moves to a pre-beta gate, split by device
+**Date:** 2026-09-25
+**Decision:** The five open hardware checks no longer precede Phase 3 design. They must be done before any V2 build work that depends on their results, and in any case before beta.
+**Why:** no Phase 3 *design* question depends on the results. D-014 already commits the LP timeline to a clock reference whatever the measurements show, and R-28 is a one-argument revert.
+**Constraint — device access:** no Android device until ~2026-09-28, and the iPhone needs a Mac or a cloud build route before it can be used at all.
+**Split:** emulator for functional checks only; Pixel for listening and Android background behavior; iOS pending a build route.
+**References:** D-012, D-014, D-017, D-018; `ROADMAP.md` "Needs hardware validation."
+
 ### D-018 — Saved mixes are faithful snapshots for now; snapshot-vs-recipe is a V2 LP decision
 **Date:** 2026-09-25
 **Decision:** A saved mix is a **faithful snapshot** of the engine's layers. Each layer records its kind (sample, soundscape, tone, binaural), its volume, and the parameters needed to rebuild it: pitch-shift ratio for soundscapes, frequency for tones, carrier and beat frequency for binaural. The saved format gains a schema **`version` field (2)**.
@@ -153,6 +169,11 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 ---
 
 ## CHANGELOG
+
+### C-018 — Session handoff note; hardware validation regrouped; stale phase lines fixed
+**Date:** 2026-09-25
+**Change:** Documentation only — **no code changed**. **`SESSION_HANDOFF.md` (new):** non-canonical "where we left off" note for the next design conversation — start-of-conversation routine (D-020), working model, state at handoff, the Phase 3 open questions, inherited decisions, known gaps, and the deferred hardware validation (D-019). **`DOCMAP.md`:** registered `SESSION_HANDOFF.md` in Tier 1 after DOCMAP (as non-canonical; doc-count wording, repository-layout tree and root description updated to stay true); replaced the stale Phase 2 "Current phase" section with Phase 3 (design); last-updated date. **`ROADMAP.md`:** last-updated date; "Open validation debt" line rewritten as a pre-beta gate per D-019; "Needs hardware validation" intro rewritten and items grouped under Android emulator / Android device — Pixel / iOS device. Every existing item and its detail kept: the D-014 background-audio item was split into its Android half (Pixel) and the SoLoud `SoundHandle` iOS-interruption check (iOS); the D-018 saved-mix item was split into a functional emulator check and a by-ear Pixel check; a new iOS build-route item was added. The group now holds eight checkboxes covering the five original checks. **`CLAUDE.md`:** added the "Always push after committing" working default (D-020); updated "Current phase". **`PRODUCT_DESIGN.md`:** "Last updated" corrected to July 23, 2026, the date of its most recent content commit (§3.7/§3.8); nothing else changed. **`DECISIONS_AND_CHANGELOG.md`:** D-019, D-020, this entry.
+**Reference:** Decisions D-019, D-020.
 
 ### C-017 — Saved mixes round-trip all layer kinds (D-018)
 **Date:** 2026-09-25

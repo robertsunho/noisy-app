@@ -2,9 +2,9 @@
 
 Forward-looking plan for Noisy. Claude Code marks items complete (`[x]`) as work lands, with a Changelog entry for each. Ordered by phase; phases are sequenced but not time-boxed.
 
-**Last updated:** July 24, 2026
+**Last updated:** 2026-09-25
 **Current phase:** Phase 3 — Product Reimagining (Phase 2 complete)
-**Open validation debt:** see [Needs hardware validation](#needs-hardware-validation) — R-28 carrier change and the D-014 background-audio predictions both await one device pass.
+**Open validation debt:** [hardware validation](#needs-hardware-validation) (the five original checks, now eight items grouped by device — see the section below) is a pre-beta gate, deferred pending devices per D-019; it does not block Phase 3 design.
 
 ---
 
@@ -73,13 +73,24 @@ Slow. These are latent bugs or design decisions. Some may be *promoted* into the
 
 ## Needs hardware validation
 
-Claims accepted into the canonical docs that have **not** been checked on a real device. Emulators and Chrome are not adequate for any of these (`ENGINEERING_PRINCIPLES.md` — audio is judged on Android, never Chrome). These share **one device pass**; do it before the V2 audio work depends on them.
+Claims accepted into the canonical docs that have **not** been checked on a real device. These are **pre-beta gates**: do them before any V2 build work that depends on their results, and in any case before beta (D-019). The emulator is acceptable only for *functional* checks. Listening judgments and all background/lifecycle behavior need real hardware (`ENGINEERING_PRINCIPLES.md` — audio is judged on Android devices, never Chrome).
+
+### Android emulator (can run now)
+
+- [ ] **Live text-input generation** (D-017) — run one live text-input generation to confirm the model still responds and `themes` come back in the new format. The pinned model `claude-sonnet-4-20250514` may be subject to retirement. The feature fails silently (falls back to the sliders), so it must be checked deliberately.
+- [ ] **Saved-mix reload — functional** (D-018) — save and reload a mood-generated mix; confirm the reloaded layers are all present and the app doesn't go silent.
+
+### Android device — Pixel
 
 - [ ] **Beta/gamma binaural carrier range** (R-28 / D-012) — the 200–400 Hz carrier is now active for beta/gamma beats, a deliberate audible change to Focus/Energize mixes (e.g. C4 root + 528 Hz: 98 Hz → 392 Hz). **A/B by ear**, alongside the mix-glue and MotifEngine-density work. If wrong, reverting is a one-argument change.
-- [ ] **Background-audio behavior** (D-014) — the Track A / Track B decomposition is reasoned from code, plugin manifests, and platform contracts, **not measured**. Specifically unverified: how fast Android freezes or kills the process without a foreground service (and how much worse aggressive OEM power management is); **whether SoLoud `SoundHandle`s survive an iOS audio interruption** — `ToneService` stores handles with no revalidation path, so if they don't, every tone and binaural layer becomes a silent no-op the app still reports as playing; whether a stall partway through `AudioEngine`'s crossfade is reachable in practice (listen for phasey doubling at loop boundaries); and whether `Stopwatch`'s monotonic clock stalls under deep device sleep, which would make a 30-minute sleep timer run long.
+- [ ] **Background-audio behavior — Android half** (D-014) — the Track A / Track B decomposition is reasoned from code, plugin manifests, and platform contracts, **not measured**. Specifically unverified on Android: how fast Android freezes or kills the process without a foreground service (and how much worse aggressive OEM power management is); whether a stall partway through `AudioEngine`'s crossfade is reachable in practice (listen for phasey doubling at loop boundaries); and whether `Stopwatch`'s monotonic clock stalls under deep device sleep, which would make a 30-minute sleep timer run long.
+- [ ] **Saved-mix reload — by ear** (D-018) — save and reload a mood-generated mix on device, and confirm tones, binaural and pitch are restored by ear.
+
+### iOS device
+
+- [ ] **SoLoud `SoundHandle` survival across an audio interruption** (D-014) — **whether SoLoud `SoundHandle`s survive an iOS audio interruption**: `ToneService` stores handles with no revalidation path, so if they don't, every tone and binaural layer becomes a silent no-op the app still reports as playing.
 - [ ] **iOS generally** — `TECHNICAL_ARCHITECTURE.md` §1 records iOS as unvalidated. Expect background audio to fail there immediately and reproducibly until Track A lands.
-- [ ] **Saved-mix reload** (D-018) — save and reload a mood-generated mix on device, and confirm tones, binaural and pitch are restored by ear.
-- [ ] **Live text-input generation** (D-017) — run one live text-input generation to confirm the model still responds and `themes` come back in the new format. The pinned model `claude-sonnet-4-20250514` may be subject to retirement. The feature fails silently (falls back to the sliders), so it must be checked deliberately.
+- [ ] **Set up an iOS build route** — building for iPhone requires a Mac with Xcode, or a cloud build service (e.g. Codemagic) + TestFlight. Prerequisite for the two items above.
 
 ---
 

@@ -2,7 +2,7 @@
 
 The canonical description of Noisy as a *product* — the layer we are reimagining. Unlike `TECHNICAL_ARCHITECTURE.md` (kept accurate to code), this document is **vision-first**: it describes where the product is going and is explicit about what is **shipped** versus **aspirational**.
 
-**Last updated:** July 16, 2026
+**Last updated:** July 23, 2026
 **Status:** Under active reimagining (V2). The current shipped UX is documented in §5 as the baseline being reinvented.
 
 ---

@@ -2,18 +2,21 @@
 
 **Purpose:** This file is the orientation guide for the Noisy documentation set. It exists so that any reader — Robert, Claude in conversation, or Claude Code operating in the repo — can quickly find the right document for a given task and understand how the documents relate. Read this first.
 
-**Last updated:** July 16, 2026
+**Last updated:** 2026-09-25
 
 ---
 
 ## The canonical document set
 
-All canonical documentation lives in the `/docs` root. There are seven documents, organized into three tiers. (Non-canonical investigation artifacts and superseded documents live in subfolders — see **Repository layout** below.)
+All canonical documentation lives in the `/docs` root. There are seven canonical documents, organized into three tiers, plus one non-canonical orientation note (`SESSION_HANDOFF.md`) that sits in Tier 1 alongside this file. (Non-canonical investigation artifacts and superseded documents live in subfolders — see **Repository layout** below.)
 
 ### Tier 1 — Orientation (read first)
 
 **`DOCMAP.md`** (this file)
 Defines the doc set and routing rules. Consult when unsure which document governs a task.
+
+**`SESSION_HANDOFF.md`** — *not canon*
+The living "where we left off" note between design conversations; not canon; rewritten at the end of each design conversation; read after this file.
 
 ### Tier 2 — The two ground-truth records
 
@@ -48,6 +51,7 @@ Only canonical documents live in the `/docs` root; two subfolders hold everythin
 ```
 docs/
 ├── DOCMAP.md                     ← Tier 1 (this file)
+├── SESSION_HANDOFF.md            ← Tier 1 (non-canonical handoff note)
 ├── TECHNICAL_ARCHITECTURE.md     ← Tier 2
 ├── PRODUCT_DESIGN.md             ← Tier 2
 ├── ENGINEERING_PRINCIPLES.md     ← Tier 3
@@ -61,7 +65,7 @@ docs/
     └── noisy_design_document.md  ← pre-split design doc (v2.4)
 ```
 
-- **`docs/` root** — canonical documents only (the seven above).
+- **`docs/` root** — the seven canonical documents above, plus the non-canonical `SESSION_HANDOFF.md` orientation note.
 - **`docs/audits/`** — investigation and audit artifacts. They informed the canonical docs but are not maintained as ground truth.
 - **`docs/archive/`** — superseded documents retained for historical reference, such as the pre-split design doc (v2.4) that `TECHNICAL_ARCHITECTURE.md` and `PRODUCT_DESIGN.md` are being split out from.
 
@@ -97,9 +101,6 @@ docs/
 
 ## Current phase
 
-The project is in **Phase 2: post-hiatus reconciliation and V2 planning.** Immediate sequence:
-1. Stand up this documentation infrastructure (in progress).
-2. Reconcile the codebase and design doc via the 29 catalogued discrepancies (triaged: doc-fixes, code-comment-fixes, and design-flavored rulings).
-3. Synthesize the external evaluation and design refinements into a concrete V2 plan.
+**Phase 3 — Product Reimagining (design).** Phases 1–2 and pre-V2 hardening are complete; hardware validation is deferred to a pre-beta gate (D-019).
 
-See `ROADMAP.md` for detail.
+See `SESSION_HANDOFF.md` for where things stand and `ROADMAP.md` for detail.
