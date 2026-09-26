@@ -187,11 +187,15 @@ Eno-style generative one-shots, ~150 lines. Prime-number cycle lengths `[13,17,1
 
 Small stateless service: strict JSON-only system prompt, 100-token cap, 10s timeout, markdown-fence stripping, null-on-any-failure with slider fallback in the UI. Used as an input parser; the app degrades cleanly without it.
 
+- **Response shape:** `{"energy", "focus", "warmth", "themes"}` — three 0–1 values plus `themes`, zero to three words chosen only from the fixed vocabulary `kThemeTags` in `lib/models/theme_tags.dart` (20 tags: night, dawn, dusk, rain, water, ocean, forest, wind, snow, space, city, warmth, cold, stillness, drift, melancholy, joy, nostalgia, focus, rest — provisional, D-017). The prompt interpolates the list from that constant.
+- **Parsing** is the pure static `LlmService.parseResponseText` (returns the `MoodParse` record). energy/focus/warmth parse exactly as before themes existed; `themes` goes through `filterThemeTags`, which keeps only vocabulary matches (case-insensitive, deduped, max 3) and returns the constants themselves, so no model- or user-supplied string passes through. A missing or malformed `themes` yields `[]` and never fails an otherwise successful parse.
+- **Token cap:** the themed response is ~35–40 tokens (≈ 20 before), so the 100-token cap was left unchanged.
+
 ### 3.8 Analytics Service (`analytics_service.dart`)
 
 Five Firebase Analytics event wrappers, injected into `HomeScreen` and `MixerScreen`.
 
-> ⚠ *Privacy concern (external eval §3): `logLlmGenerate` forwards the user's raw free-text mood description to Firebase Analytics. This is sensitive data for a wellness-adjacent app — log derived values/length, not the text. Pre-launch fix, `ROADMAP.md` Phase 4.*
+**Rule (D-017, `ENGINEERING_PRINCIPLES.md` rule 9): no user-written text reaches analytics.** `logLlmGenerate` sends `text_length`, `word_count`, the resulting `energy`/`focus`/`warmth`, and `themes` (vocabulary tags comma-joined, `'none'` if empty — Firebase parameters can't be arrays; ≤ 3 tags stays under the 100-char limit). `logMixSave` sends `name_length`, not the typed mix name. The remaining events carry only app-defined values (catalog sound names, categories, slider numbers). Full-text collection is permitted only through an explicit opt-in to a separate, disclosed store — a beta requirement, not yet built (`ROADMAP.md` Phase 5).
 
 ---
 

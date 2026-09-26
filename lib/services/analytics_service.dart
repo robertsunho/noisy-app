@@ -23,19 +23,28 @@ class AnalyticsService {
   }
 
   /// Fired when the user generates via the natural language mood input.
+  ///
+  /// Never receives the user's text (D-017): only its length and word count,
+  /// the resulting slider values, and vocabulary theme tags.
   void logLlmGenerate({
-    required String userText,
+    required int textLength,
+    required int wordCount,
     required double energy,
     required double focus,
     required double warmth,
+    required List<String> themes,
   }) {
     unawaited(FirebaseAnalytics.instance.logEvent(
       name: 'noisy_llm_generate',
       parameters: {
-        'user_text': userText,
+        'text_length': textLength,
+        'word_count': wordCount,
         'energy': energy,
         'focus': focus,
         'warmth': warmth,
+        // Firebase parameters can't be arrays. ≤ 3 vocabulary words joined
+        // stays well under the 100-character parameter limit.
+        'themes': themes.isEmpty ? 'none' : themes.join(','),
       },
     ));
   }
@@ -80,11 +89,12 @@ class AnalyticsService {
     ));
   }
 
-  /// Fired when the user saves the current mix.
-  void logMixSave({required String mixName}) {
+  /// Fired when the user saves the current mix. Logs only the length of the
+  /// user-typed name, never the name itself (D-017).
+  void logMixSave({required int nameLength}) {
     unawaited(FirebaseAnalytics.instance.logEvent(
       name: 'noisy_mix_save',
-      parameters: {'mix_name': mixName},
+      parameters: {'name_length': nameLength},
     ));
   }
 }

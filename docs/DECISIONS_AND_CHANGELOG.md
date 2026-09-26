@@ -11,6 +11,14 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 
 ## DECISIONS
 
+### D-017 — User-written text never goes to analytics; fixed-vocabulary theme tags carry the product insight instead
+**Date:** 2026-09-25
+**Decision:** No text a user wrote may be sent to analytics — not the mood description, not a mix name, not any future free-text field. Now a hard guardrail (`ENGINEERING_PRINCIPLES.md` rule 9).
+**Why:** Firebase Analytics ties every event to a **persistent device ID**, and free text can **identify a person by its content alone** — a name, a place, a circumstance, a health detail. Stripping the device ID wouldn't fix that. For a wellness-adjacent app this is the wrong data to hold by default.
+**What replaces it:** the product question the raw text answered — *what are people asking for?* — is answered by **theme tags from a fixed vocabulary** (`kThemeTags`, 20 words), which the existing LLM call now returns alongside energy/focus/warmth. Only vocabulary constants ever leave the app. The vocabulary is **provisional** and is expected to inform **Radio station naming** (`PRODUCT_DESIGN.md` §3.7/§3.8 — moments and places, not promised outcomes).
+**The only route to full text:** explicit **opt-in** — a consent prompt, a **separate store with no device ID attached**, a **retention limit**, and **disclosure in the privacy policy**. That opt-in is a **beta requirement, not built now** (`ROADMAP.md` Phase 5).
+**References:** external eval §3; `ENGINEERING_PRINCIPLES.md` rule 9; `TECHNICAL_ARCHITECTURE.md` §3.7, §3.8; `ROADMAP.md` Phase 4/5.
+
 ### D-016 — HarmonicMatcher guards against non-positive / non-finite input; valid-input behavior unchanged
 **Date:** 2026-09-25
 **Decision:** Add an input guard to every public `HarmonicMatcher` method that does pitch math on a frequency (`findBestMatch`, `findBinauralCarrier`, `harmonicCompatibility`, `shiftRatioForExactMatch`). Any argument ≤ 0 or non-finite returns a neutral result instead of computing. **Behavior for every positive, finite input is unchanged** — no math, range, score, interval or threshold was touched, and all 89 C-014 tests pass unmodified.
@@ -135,6 +143,11 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 ---
 
 ## CHANGELOG
+
+### C-016 — Theme tags replace user text in analytics (D-017)
+**Date:** 2026-09-25
+**Change:** **New `lib/models/theme_tags.dart`:** `kThemeTags` (20-word vocabulary), `kMaxThemeTags = 3`, and pure `filterThemeTags`. **`llm_service.dart`:** the system prompt now asks for a `themes` field chosen only from `kThemeTags` (list interpolated from the constant; `_system` became `static final`); response parsing was pulled out into the pure static `parseResponseText`, returning a `MoodParse` record (energy/focus/warmth unchanged, plus `themes`). Fence stripping and the energy/focus/warmth casts are byte-for-byte the previous logic; a missing/malformed `themes` gives `[]` and cannot fail a parse. **Token cap left at 100:** the themed response is ~35–40 tokens versus ~20 before, so there's ample headroom; truncation (the one way a longer response could break a parse) isn't a realistic risk. **Analytics field changes:** `noisy_llm_generate` — removed `user_text` (raw description); added `text_length` (int), `word_count` (int), `themes` (comma-joined tags, `'none'` if empty); `energy`/`focus`/`warmth` unchanged. `noisy_mix_save` — removed `mix_name` (user-typed); added `name_length` (int). Audited the other events: `noisy_generate` (slider values + app category), `noisy_layer_add`/`noisy_layer_remove` (catalog sound names + category), `noisy_journey_start` (curated journey name; no call site) — no user-typed text, unchanged. Call sites updated in `home_screen.dart` and `mixer_screen.dart`. **Tests:** new `test/llm_parse_test.dart`, 20 tests — valid tags, unknown tags dropped, case/dedupe/cap, missing field, five malformed shapes, and existing fields unaffected (identical values with/without themes, int→double, fences, and prior failure cases still failing). `flutter test`: 142 passed. `flutter analyze`: no issues. **Docs:** `TECHNICAL_ARCHITECTURE.md` §3.7 (themes field, vocabulary, parser, token cap) and §3.8 (privacy callout replaced by the implemented rule); `ENGINEERING_PRINCIPLES.md` rule 9 added; `ROADMAP.md` analytics item checked off, Phase 5 beta gains the opt-in description-sharing item and a satisfaction-signals candidate.
+**Reference:** Decision D-017; external eval §3.
 
 ### C-015 — HarmonicMatcher input guard (D-016)
 **Date:** 2026-09-25

@@ -120,10 +120,12 @@ class _HomeScreenState extends State<HomeScreen> {
       _moodTextController.clear();
       await _generate();
       widget.analyticsService.logLlmGenerate(
-        userText: text,
+        textLength: text.length,
+        wordCount: text.split(RegExp(r'\s+')).length,
         energy: _energy,
         focus: _focus,
         warmth: _warmth,
+        themes: result.themes,
       );
     } else {
       setState(() => _isParsing = false);

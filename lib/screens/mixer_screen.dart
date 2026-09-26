@@ -265,7 +265,8 @@ class MixerScreenState extends State<MixerScreen> {
                           createdAt: DateTime.now(),
                         );
                         await widget.storage.save(mix);
-                        widget.analyticsService.logMixSave(mixName: mix.name);
+                        widget.analyticsService.logMixSave(
+                            nameLength: mix.name.length);
                         widget.onMixSaved?.call();
                         if (ctx.mounted) Navigator.pop(ctx);
                       }

@@ -2,7 +2,7 @@
 
 Noisy-specific invariants and guardrails. **Not** a general style guide — this document exists only to protect the things that are specifically easy to break in *this* project. Consult before every code change (per `DOCMAP.md`).
 
-**Last updated:** July 16, 2026
+**Last updated:** September 25, 2026
 
 ---
 
@@ -37,6 +37,9 @@ When you find a mismatch between a canonical doc and the code, do **not** silent
 
 ### 8. The crown jewel gets tests.
 `HarmonicMatcher` (and, where practical, `MoodEngine` category inference and selection) should have unit tests. A table of `root × solfeggio → (shift, interval, carrier Hz, degree)` protects against silent regressions. Current coverage is a single smoke test; this is a known gap (external eval §2 #5). New harmonic-matcher work should not land without corresponding tests.
+
+### 9. No user-written text in analytics.
+User text may be collected only by explicit opt-in into a separate, disclosed store. Firebase Analytics ties every event to a persistent device ID, and free text can identify a person by its content alone. Log derived, non-identifying signals instead — lengths, counts, slider values, and theme tags from the fixed `kThemeTags` vocabulary (`lib/models/theme_tags.dart`). (D-017.)
 
 ---
 
