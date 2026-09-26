@@ -111,11 +111,11 @@ Promoted from Phase 2 Bucket C (see D-013):
 Launch-blocker candidates from external evaluation (to be scheduled here or earlier as ruled):
 - [ ] **Background/lock-screen audio — platform configuration for continuous playback** *(additive; no engine-logic changes)*. Android foreground service (`FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `mediaPlayback` service, notification); iOS `UIBackgroundModes: audio` + activated `AVAudioSession` playback category; wire `audio_session` (**already in the dependency tree** transitively via `just_audio` — present but never imported or configured) or adopt `audio_service`. Per **D-014** this is sufficient for continuous/Radio-style playback on its own: the native audio layer sustains sound without Dart timers. Also add a lifecycle observer — the app currently has none. *(external eval §2 #1; D-004 scoped by D-014.)*
 - [ ] SoLoud migration for true pitch-shift-without-tempo-change; may shrink the 144-soundscape target (external eval §2 #2)
-- [ ] Move Anthropic API call server-side (Cloud Function); stop bundling `.env` in the app (external eval §3)
+- [ ] Move Anthropic API call server-side (Cloud Function); stop bundling `.env` in the app (external eval §3) — *deferred to V2 per D-015; remains a hard launch blocker.*
 - [ ] Stop sending raw user mood-text to Firebase Analytics (external eval §3)
 - [ ] Replace `com.example.*` placeholder app IDs; real release signing (external eval §3)
 - [ ] Saved mixes are lossy (don't round-trip pitch/tone/binaural params) (external eval §2 #4)
-- [ ] Unit tests for `HarmonicMatcher` (the crown jewel, currently one smoke test) (external eval §2 #5)
+- [x] Unit tests for `HarmonicMatcher` (the crown jewel, currently one smoke test) (external eval §2 #5) — *done 2026-09-25 (C-014): table-driven suite in `test/harmonic_matcher_test.dart`, 89 tests, expectations derived from equal-temperament theory.*
 
 ---
 

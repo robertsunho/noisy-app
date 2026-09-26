@@ -11,6 +11,13 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 
 ## DECISIONS
 
+### D-015 — Moving the Anthropic API call server-side is deferred to V2; it remains a hard launch blocker
+**Date:** 2026-09-25
+**Decision:** The pre-launch item to move the Anthropic call behind a server (Cloud Function) and stop bundling `.env` in the app (`ENGINEERING_PRINCIPLES.md` rule 6; external eval §3) is **deferred to V2** rather than done in the pre-V2 hardening pass.
+**Why:** (1) **It is new deployment infrastructure**, not a hardening fix — standing up, securing, and operating a server-side endpoint is a new surface, out of scope for a pass meant to protect what already exists. (2) **The LLM input's role may change in the LP/Radio restructure** (`PRODUCT_DESIGN.md` §3.7); building the server contract now risks building it for an input shape that V2 replaces. (3) **Nothing is distributed yet**, so there is no current exposure — the key is not in any shipped binary.
+**Constraint, stated plainly:** this is a deferral, **not** a downgrade. It **remains a hard launch blocker**: no build may be distributed while the key is bundled in the app.
+**References:** `ENGINEERING_PRINCIPLES.md` rule 6; `ROADMAP.md` Phase 4; `TECHNICAL_ARCHITECTURE.md` §3.7; external eval §3.
+
 ### D-014 — Background audio is not a monolithic engine threat: it decomposes into config (Radio) and timing rework (LP)
 **Date:** 2026-07-24
 **Decision:** Verdict on the read-only background-audio investigation, which refines **D-004**. The risk is **real but not undifferentiated** — it splits cleanly by experience type, and only one half touches the preserved engine.
@@ -119,6 +126,11 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 ---
 
 ## CHANGELOG
+
+### C-014 — Table-driven HarmonicMatcher test suite; API-key deferral recorded (D-015)
+**Date:** 2026-09-25
+**Change:** Added `test/harmonic_matcher_test.dart` — **89 tests**, table-driven, closing the `ENGINEERING_PRINCIPLES.md` rule 8 gap (previously one smoke test). **`harmonic_matcher.dart` untouched.** Every expectation was derived independently from music theory (12-TET, A4 = 440 Hz = MIDI 69; standard ET table Hz values; 528 Hz cases hand-computed from log₂(528/440)), not copied from code output. Coverage: `frequencyToMidi`/`midiToFrequency` known points and round trips (14 frequencies; MIDI 0–127); `semitonesBetween` sign/direction, octave folding into ±6, octave/multi-octave → 0, tritone boundary; `harmonicCompatibility` for every scored interval plus five "other" intervals → 0.3; `findBestMatch` for nine root × target pairs with hand-derived least-shift interval, shift, ratio and resulting root, plus a sweep asserting the ≤ 1.5 st maximum shift implied by the consonant set; `findBinauralCarrier` — near-root → 5th (including degree-1/degree-11 wraparound), otherwise → root, 80–300 vs 200–400 Hz windows, the ≥ 15 Hz threshold at 15 and 14.99, the **D-012 worked example** (C4 + 528 Hz → 98 Hz default, 392 Hz beta), the **196 Hz < 200 Hz floor** boundary, the upper-octave-wins preference, and the four catalog roots cited in C-011 re-derived by hand. **Finding — fallback is unreachable:** the "no octave fits the window" branch cannot trigger for any positive finite root (candidates are x, 2x, 4x, 8x with x ∈ [40, 80]; the default window always contains 2x, and the one-octave beta window always contains 4x or 8x), so it cannot be exercised directly; a sweep test instead pins the in-window guarantee it would provide. Also noted, untested by design: a root of 0 or below sends the octave-reduction loop into an infinite loop, and a NaN input throws in `round()` — degenerate inputs no current call site produces. First run had 6 failures, all in `semitonesBetween` and all ≤ 5e-6 st off: ruled a **test-tolerance error** (1e-6 st was tighter than the rounding in the 4-decimal Hz literals); tolerance set to 1e-4 st (0.01 cent), no expected value changed. `flutter test`: 90 passed. `flutter analyze`: no issues. **Docs:** checked off the HarmonicMatcher-tests item in `ROADMAP.md` Phase 4 and annotated the server-side API-call item with D-015; recorded D-015; updated `CLAUDE.md` current phase to Phase 3 (Phase 2 complete; finishing pre-V2 hardening).
+**Reference:** `ENGINEERING_PRINCIPLES.md` rules 2 and 8; `TECHNICAL_ARCHITECTURE.md` §3.5; D-012; D-015; external eval §2 #5.
 
 ### C-013 — Record the background-audio investigation verdict (D-014)
 **Date:** 2026-07-24

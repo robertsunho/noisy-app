@@ -44,4 +44,4 @@ All canonical docs live in `/docs` (root = canonical only; `docs/audits/` = inve
 
 ## Current phase
 
-Phase 2 — reconciliation. The immediate work is ruling on the 29 catalogued discrepancies in `docs/audits/AUDIT_REPORT.md`, triaged into buckets in `docs/ROADMAP.md`. See the roadmap for what's next.
+Phase 3 — Product Reimagining (Phase 2 complete; finishing pre-V2 hardening). See `docs/ROADMAP.md` for what's next.
