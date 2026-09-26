@@ -11,6 +11,15 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 
 ## DECISIONS
 
+### D-016 — HarmonicMatcher guards against non-positive / non-finite input; valid-input behavior unchanged
+**Date:** 2026-09-25
+**Decision:** Add an input guard to every public `HarmonicMatcher` method that does pitch math on a frequency (`findBestMatch`, `findBinauralCarrier`, `harmonicCompatibility`, `shiftRatioForExactMatch`). Any argument ≤ 0 or non-finite returns a neutral result instead of computing. **Behavior for every positive, finite input is unchanged** — no math, range, score, interval or threshold was touched, and all 89 C-014 tests pass unmodified.
+**Why this is a real hazard, not hygiene:** C-014 found that a root ≤ 0 sends `findBinauralCarrier`'s octave-reduction loop into an **infinite loop**, and NaN/infinity throw in `round()`. And a zero root already exists in the codebase: `Journey.sleepTimer`'s `toSource()` builds `SoundscapeSource(rootFrequency: 0.0)` as a placeholder (R-10). It is inert today — the sleep-timer reload path reads `pitchShiftRatio`, never `rootFrequency` — but any future code that routes that value into the matcher would freeze the app on the UI isolate.
+**Neutral results, chosen by how each is consumed:** `findBestMatch` → shift 0, ratio 1.0, interval `'none'`, resulting root = input root (both call sites — `MoodEngine.toSource`, `MotifEngine.start` — read only `shiftRatio`, and 1.0 is exactly what they use when no match is attempted). `findBinauralCarrier` → the caller's new optional `fallbackCarrierHz`, degree `'Fixed'`; `MoodEngine` now passes its per-preset fixed carrier `p.$1` (150 Hz delta/theta, 200 Hz alpha/beta/gamma), so the guard returns *exactly* the carrier it already uses when no soundscape/solfeggio pair exists. The matcher cannot know the preset, hence the parameter rather than a hardcoded copy. Callers that pass nothing (the tone-test screen) get `defaultFallbackCarrierHz` = 200 Hz — the one existing fixed carrier inside both the 80–300 and 200–400 Hz windows. `harmonicCompatibility` → 0.3, the score `MoodEngine` already gives a soundscape with no root. `shiftRatioForExactMatch` (no current callers) → 1.0. The pure conversions (`frequencyToMidi`, `midiToFrequency`, `semitonesBetween`) are left unguarded: they don't loop, and −∞/NaN is their mathematically honest answer.
+**Loud in debug, without throwing:** invalid input is logged via `dart:developer` `log` at severe level (1000) with the method name and bad value, inside an `assert` closure so it compiles out of release. **A throwing assert was considered and rejected:** `flutter test` always runs with asserts on, so a throw would leave the *shipped release behavior* — the neutral results — untestable; and generation paths catch exceptions broadly (`HomeScreen`'s generate handler is `catch (_)`), so a debug throw could be swallowed silently rather than being loud.
+**Stronger long-term fix (V2):** make `SoundscapeSource.rootFrequency` nullable, so the type system rejects a missing root at compile time instead of relying on a `0.0` sentinel and a runtime guard.
+**References:** C-014 (finding); R-10 (the placeholder); `ENGINEERING_PRINCIPLES.md` rules 2 and 8; `TECHNICAL_ARCHITECTURE.md` §3.5.
+
 ### D-015 — Moving the Anthropic API call server-side is deferred to V2; it remains a hard launch blocker
 **Date:** 2026-09-25
 **Decision:** The pre-launch item to move the Anthropic call behind a server (Cloud Function) and stop bundling `.env` in the app (`ENGINEERING_PRINCIPLES.md` rule 6; external eval §3) is **deferred to V2** rather than done in the pre-V2 hardening pass.
@@ -126,6 +135,11 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 ---
 
 ## CHANGELOG
+
+### C-015 — HarmonicMatcher input guard (D-016)
+**Date:** 2026-09-25
+**Change:** Per D-016, `harmonic_matcher.dart` gains a private `_isValidHz` check (finite and > 0) and a debug-only severe-level `dart:developer` log (inside an `assert` closure; no Flutter import, so rule 2 purity holds), applied at the top of `findBestMatch`, `findBinauralCarrier`, `harmonicCompatibility` and `shiftRatioForExactMatch`. `findBinauralCarrier` gains an optional `fallbackCarrierHz` parameter and a public `defaultFallbackCarrierHz = 200.0`. `mood_engine.dart`: one added argument, `fallbackCarrierHz: p.$1`, at the existing `findBinauralCarrier` call. No math, range, score or interval changed. **Tests:** 32 added to `test/harmonic_matcher_test.dart` — 0, negative, NaN, +∞ and −∞ on each argument of each guarded method (with a 5 s timeout so a regression fails rather than hangs), a check that `fallbackCarrierHz` has no effect on valid input, and that 200 Hz lies in both windows. The 89 C-014 tests are unchanged. `flutter test`: 122 passed. `flutter analyze`: no issues. **Docs:** `TECHNICAL_ARCHITECTURE.md` §3.5 notes the guard and marks the "no octave fits" fallback as unreachable (per C-014).
+**Reference:** Decision D-016; C-014; R-10.
 
 ### C-014 — Table-driven HarmonicMatcher test suite; API-key deferral recorded (D-015)
 **Date:** 2026-09-25

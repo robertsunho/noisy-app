@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'dart:math';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,6 +45,37 @@ class HarmonicMatcher {
     'octave',
   ];
 
+  /// Carrier returned by [findBinauralCarrier] for invalid input when the
+  /// caller supplies no fallback. 200 Hz is the fixed carrier `MoodEngine`
+  /// uses for alpha/beta/gamma, and lies inside both carrier windows.
+  static const defaultFallbackCarrierHz = 200.0;
+
+  // ── Input guard (D-016) ───────────────────────────────────────────────────
+
+  /// A frequency the pitch math can handle: finite and strictly positive.
+  /// A root ≤ 0 would send the octave-reduction loop in [findBinauralCarrier]
+  /// into an infinite loop; NaN/infinity throw in `round()`.
+  static bool _isValidHz(double hz) => hz.isFinite && hz > 0;
+
+  /// Debug-only, non-throwing: logs invalid input at severe level so it stands
+  /// out in the console. Compiled out of release builds. Deliberately not a
+  /// throwing assert — see D-016.
+  static void _reportInvalid(String method, Map<String, double> args) {
+    assert(() {
+      final bad = args.entries
+          .where((e) => !_isValidHz(e.value))
+          .map((e) => '${e.key}=${e.value}')
+          .join(', ');
+      developer.log(
+        'HarmonicMatcher.$method: invalid frequency input ($bad) — '
+        'returning neutral result',
+        name: 'HarmonicMatcher',
+        level: 1000,
+      );
+      return true;
+    }());
+  }
+
   // ── Core pitch math ───────────────────────────────────────────────────────
 
   /// Converts [hz] to a (fractional) MIDI note number.
@@ -80,6 +112,17 @@ class HarmonicMatcher {
   /// current root.  The interval with the smallest absolute shift wins.
   static HarmonicMatch findBestMatch(
       double soundscapeRootHz, double targetHz) {
+    if (!_isValidHz(soundscapeRootHz) || !_isValidHz(targetHz)) {
+      _reportInvalid('findBestMatch',
+          {'soundscapeRootHz': soundscapeRootHz, 'targetHz': targetHz});
+      return HarmonicMatch(
+        shiftSemitones: 0.0,
+        shiftRatio: 1.0,
+        intervalName: 'none',
+        resultingRootHz: soundscapeRootHz,
+      );
+    }
+
     double bestAbs = double.infinity;
     double bestShift = 0.0;
     int bestIdx = 0;
@@ -113,6 +156,11 @@ class HarmonicMatcher {
   /// nearest octave of [targetHz] (unison relationship only).
   static double shiftRatioForExactMatch(
       double soundscapeRootHz, double targetHz) {
+    if (!_isValidHz(soundscapeRootHz) || !_isValidHz(targetHz)) {
+      _reportInvalid('shiftRatioForExactMatch',
+          {'soundscapeRootHz': soundscapeRootHz, 'targetHz': targetHz});
+      return 1.0;
+    }
     final shift = semitonesBetween(soundscapeRootHz, targetHz);
     return pow(2.0, shift / 12.0).toDouble();
   }
@@ -125,8 +173,16 @@ class HarmonicMatcher {
   ///   4  (major 3rd)       → 0.8
   ///   3  (minor 3rd)       → 0.7
   ///   all other intervals  → 0.3
+  ///
+  /// Invalid input (≤ 0 or non-finite) scores 0.3 — the same neutral score
+  /// `MoodEngine` gives a soundscape with no root frequency.
   static double harmonicCompatibility(
       double soundscapeRootHz, double solfeggioHz) {
+    if (!_isValidHz(soundscapeRootHz) || !_isValidHz(solfeggioHz)) {
+      _reportInvalid('harmonicCompatibility',
+          {'soundscapeRootHz': soundscapeRootHz, 'solfeggioHz': solfeggioHz});
+      return 0.3;
+    }
     double raw = frequencyToMidi(solfeggioHz) - frequencyToMidi(soundscapeRootHz);
     raw = raw % 12.0;
     if (raw < 0) raw += 12.0;
@@ -159,8 +215,23 @@ class HarmonicMatcher {
   /// Among valid octave candidates in range, the one furthest in actual
   /// (non-octave-folded) semitones from the solfeggio is preferred so the
   /// carrier does not crowd the melodic layer.
+  ///
+  /// Invalid input (≤ 0 or non-finite root or solfeggio) returns
+  /// [fallbackCarrierHz] (default [defaultFallbackCarrierHz]) with degree name
+  /// `'Fixed'` — the same fixed carrier `MoodEngine` uses when no
+  /// soundscape/solfeggio pair exists. See D-016.
   static ({double carrierHz, String degreeName}) findBinauralCarrier(
-      double soundscapeRootHz, double solfeggioHz, {double? beatFrequencyHz}) {
+      double soundscapeRootHz, double solfeggioHz,
+      {double? beatFrequencyHz, double? fallbackCarrierHz}) {
+    if (!_isValidHz(soundscapeRootHz) || !_isValidHz(solfeggioHz)) {
+      _reportInvalid('findBinauralCarrier',
+          {'soundscapeRootHz': soundscapeRootHz, 'solfeggioHz': solfeggioHz});
+      return (
+        carrierHz: fallbackCarrierHz ?? defaultFallbackCarrierHz,
+        degreeName: 'Fixed',
+      );
+    }
+
     // Solfeggio scale degree relative to root, folded into [0, 12).
     double raw = frequencyToMidi(solfeggioHz) - frequencyToMidi(soundscapeRootHz);
     raw = raw % 12.0;

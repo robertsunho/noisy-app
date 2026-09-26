@@ -322,5 +322,76 @@ void main() {
         }
       }
     });
+
+    test('fallbackCarrierHz has no effect on valid input', () {
+      final r = HarmonicMatcher.findBinauralCarrier(c4, 528.0,
+          beatFrequencyHz: 20, fallbackCarrierHz: 150.0);
+      expect(r.carrierHz, closeTo(g4, hzTol));
+      expect(r.degreeName, 'Perfect 5th');
+    });
+  });
+
+  // ── Input guard (D-016) ──────────────────────────────────────────────────
+  // Non-positive or non-finite frequencies must return a neutral result
+  // promptly. Before the guard, a root ≤ 0 hung findBinauralCarrier forever
+  // and NaN/infinity threw; the timeout makes a regression fail, not hang.
+  group('input guard', () {
+    const bad = <(String, double)>[
+      ('0', 0.0),
+      ('negative', -220.0),
+      ('NaN', double.nan),
+      ('+infinity', double.infinity),
+      ('−infinity', double.negativeInfinity),
+    ];
+    const noHang = Timeout(Duration(seconds: 5));
+
+    for (final (name, v) in bad) {
+      test('findBestMatch: root $name → shift 0, ratio 1.0', () {
+        final m = HarmonicMatcher.findBestMatch(v, 528.0);
+        expect(m.shiftSemitones, 0.0);
+        expect(m.shiftRatio, 1.0);
+        expect(m.intervalName, 'none');
+      }, timeout: noHang);
+
+      test('findBestMatch: target $name → shift 0, ratio 1.0', () {
+        final m = HarmonicMatcher.findBestMatch(c4, v);
+        expect(m.shiftSemitones, 0.0);
+        expect(m.shiftRatio, 1.0);
+        expect(m.intervalName, 'none');
+        expect(m.resultingRootHz, c4);
+      }, timeout: noHang);
+
+      test('shiftRatioForExactMatch: root/target $name → 1.0', () {
+        expect(HarmonicMatcher.shiftRatioForExactMatch(v, 528.0), 1.0);
+        expect(HarmonicMatcher.shiftRatioForExactMatch(c4, v), 1.0);
+      }, timeout: noHang);
+
+      test('harmonicCompatibility: root/solfeggio $name → 0.3', () {
+        expect(HarmonicMatcher.harmonicCompatibility(v, 528.0), 0.3);
+        expect(HarmonicMatcher.harmonicCompatibility(c4, v), 0.3);
+      }, timeout: noHang);
+
+      test('findBinauralCarrier: root $name → fixed default carrier', () {
+        for (final beat in [null, 2.0, 20.0]) {
+          final r = HarmonicMatcher.findBinauralCarrier(v, 528.0,
+              beatFrequencyHz: beat);
+          expect(r.carrierHz, HarmonicMatcher.defaultFallbackCarrierHz);
+          expect(r.degreeName, 'Fixed');
+        }
+      }, timeout: noHang);
+
+      test('findBinauralCarrier: solfeggio $name → caller fallback', () {
+        final r = HarmonicMatcher.findBinauralCarrier(c4, v,
+            beatFrequencyHz: 6.0, fallbackCarrierHz: 150.0);
+        expect(r.carrierHz, 150.0);
+        expect(r.degreeName, 'Fixed');
+      }, timeout: noHang);
+    }
+
+    test('default fallback carrier (200 Hz) lies inside both windows', () {
+      const f = HarmonicMatcher.defaultFallbackCarrierHz;
+      expect(f, inInclusiveRange(80.0, 300.0));
+      expect(f, inInclusiveRange(200.0, 400.0));
+    });
   });
 }
