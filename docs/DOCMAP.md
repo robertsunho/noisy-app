@@ -2,7 +2,7 @@
 
 **Purpose:** This file is the orientation guide for the Noisy documentation set. It exists so that any reader — Robert, Claude in conversation, or Claude Code operating in the repo — can quickly find the right document for a given task and understand how the documents relate. Read this first.
 
-**Last updated:** 2026-09-25
+**Last updated:** 2026-10-02
 
 ---
 
@@ -46,7 +46,7 @@ The forward-looking plan: what's done, what's next, what's deferred, in what ord
 
 ## Repository layout
 
-Only canonical documents live in the `/docs` root; two subfolders hold everything else.
+Only canonical documents live in the `/docs` root; three subfolders hold everything else.
 
 ```
 docs/
@@ -58,6 +58,8 @@ docs/
 ├── CONTENT_PRODUCTION.md         ← Tier 3
 ├── DECISIONS_AND_CHANGELOG.md    ← Tier 3
 ├── ROADMAP.md                    ← Tier 3
+├── design-inputs/                ← design inputs adopted by decision (direction, not canon)
+│   └── noisy_v2_foundation.md    ← V2 strategy & design foundation (D-021)
 ├── audits/                       ← investigation & audit artifacts (inputs, not canon)
 │   ├── AUDIT_REPORT.md
 │   └── noisy_independent_evaluation.md
@@ -66,6 +68,7 @@ docs/
 ```
 
 - **`docs/` root** — the seven canonical documents above, plus the non-canonical `SESSION_HANDOFF.md` orientation note.
+- **`docs/design-inputs/`** — design inputs adopted by decision — direction-setting, not maintained as ground truth; canonical docs win on current technical state. Currently holds `noisy_v2_foundation.md`, the V2 strategy & design foundation adopted by D-021.
 - **`docs/audits/`** — investigation and audit artifacts. They informed the canonical docs but are not maintained as ground truth.
 - **`docs/archive/`** — superseded documents retained for historical reference, such as the pre-split design doc (v2.4) that `TECHNICAL_ARCHITECTURE.md` and `PRODUCT_DESIGN.md` are being split out from.
 

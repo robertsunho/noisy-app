@@ -11,6 +11,25 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 
 ## DECISIONS
 
+### D-021 — V2 direction adopted: music-first, three rooms, LP and Radio both at launch
+**Date:** 2026-10-02
+**Decision:** The V2 design adopts `docs/design-inputs/noisy_v2_foundation.md` as its direction:
+- **Positioning.** Noisy is a music product ("a living ambient album, handmade, that responds to you"), not a wellness utility. Functional keywords (sleep, focus, rain) live in store metadata only, never in the UI.
+- **Rooms.** Three rooms: Radio (infinite, shared), LP (finite, commissioned, ends), and Collection (what you've kept). The Studio is cut from navigation and kept as a hidden dev tool.
+- **Both at launch.** LP and Radio both ship at launch. They are equal functions serving distinct purposes, not a choice between them.
+- **Monetization direction.** Subscription for the service; purchases for owned objects (LP pressings as DRM-free audio). Pricing remains open.
+**Supersedes:** the "emerging" status of `PRODUCT_DESIGN.md` §3.7. Refines D-010: Radio carries a vocabulary of moments and places; LP routes through no categories.
+**Roads not taken:** an LP-vs-Radio bake-off, and a Radio-only v1. Radio-only was cheaper (D-014 Track A config only; no typed input, so D-015 could wait; D-018 mostly moot) but was rejected because LP is the form closest to the thesis.
+**Working hypothesis (not yet a decision), to be tested in threads 1–2 — the Score model.** LP and Radio share one engine. A *score* is a timeline of musical sections (key, layers, density, transitions):
+- The LP composer writes a finite score from a description.
+- The Radio programmer writes an infinite score for each station as a pure function of station + clock, so every listener computes the same broadcast with no stream server.
+- One clock-driven performer plays any score (D-014 Track B).
+- A saved pressing is its score. Randomness happens at composition time, so playback is exact; this would resolve D-018's snapshot-vs-recipe question.
+- Offline rendering of a score to audio is the largest unscoped engineering unknown.
+**Working method:** design leads engineering, within the medium's real constraints. Sound decisions are made by ear. Work is organized into six threads, tracked on the thread board in `SESSION_HANDOFF.md`.
+**Caveat:** the Foundation doc's §1 (technical status) predates C-014 to C-018. Where it conflicts with the canonical docs on current technical state, the canonical docs win.
+**References:** D-001, D-010, D-014, D-015, D-018; `PRODUCT_DESIGN.md` §3.7–3.8.
+
 ### D-020 — The design conversation reads the repo from GitHub; Project sync becomes once per conversation
 **Date:** 2026-09-25
 **Decision:** Claude in chat clones the public repo read-only and pulls before each review, instead of relying on Robert re-syncing the Project's GitHub source after every commit.
@@ -169,6 +188,11 @@ Append-only record of decisions (*why*, including roads not taken) and changes (
 ---
 
 ## CHANGELOG
+
+### C-019 — V2 direction adopted (D-021); thread board; launch-readiness phase
+**Date:** 2026-10-02
+**Change:** Documentation only — **no code changed**. **`docs/design-inputs/noisy_v2_foundation.md` (new):** the V2 strategy & design foundation, added verbatim. **`DOCMAP.md`:** `docs/design-inputs/` added to the repository layout (adopted design inputs; direction-setting, not ground truth) with the Foundation doc under it; last-updated date. **`PRODUCT_DESIGN.md`:** V2-direction note under the status line; §3.7 "Status: emerging" callout replaced with "adopted (D-021)"; last-updated date; no other section rewritten yet. **`ROADMAP.md`:** Phase 3 raw-material list replaced by six design threads (Experience & rooms; Sound & form; Visual identity; Content production; Architecture & engineering; Business & launch), each with a one-line scope and the existing items moved beneath it; thread 4 gains the loudness-normalization item; new Phase 5 — Launch Readiness (server-side API key and app IDs/signing moved from Phase 4; iOS build route, privacy policy absorbing the existing disclosure bullets, store-review risk review, entitlements/IAP added); former Phase 5+ renumbered Phase 6+; last-updated date. **`TECHNICAL_ARCHITECTURE.md`:** §3.8's pointer to the opt-in beta item updated from Phase 5 to Phase 6 (renumbering only). **`SESSION_HANDOFF.md`:** date and "Opens" line; "What the V2 conversation is for" replaced by the thread board; D-021 added to inherited decisions. **`DECISIONS_AND_CHANGELOG.md`:** D-021, this entry.
+**Reference:** Decision D-021.
 
 ### C-018 — Session handoff note; hardware validation regrouped; stale phase lines fixed
 **Date:** 2026-09-25

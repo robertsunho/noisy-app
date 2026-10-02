@@ -2,8 +2,9 @@
 
 The canonical description of Noisy as a *product* — the layer we are reimagining. Unlike `TECHNICAL_ARCHITECTURE.md` (kept accurate to code), this document is **vision-first**: it describes where the product is going and is explicit about what is **shipped** versus **aspirational**.
 
-**Last updated:** July 23, 2026
+**Last updated:** October 2, 2026
 **Status:** Under active reimagining (V2). The current shipped UX is documented in §5 as the baseline being reinvented.
+**V2 direction adopted — D-021.** Three rooms (Radio, LP, Collection), both at launch, music-first. Sections below are being rewritten thread by thread; until then, D-021 and `docs/design-inputs/noisy_v2_foundation.md` govern where they conflict.
 
 ---
 
@@ -64,7 +65,7 @@ The disparate layers currently sum without binding into one space. A candidate *
 The five curated Journeys still use legacy `SampleSource` MP3s and **bypass the harmonic system entirely** *(audit #29 / external eval §3b)* — so a first-time user sampling "Journeys" hears the *old* product, not the differentiated one. Resolving this is both a correctness item and a product-first-impression priority.
 
 ### 3.7 The LP / Radio axis (emerging)
-> **Status: emerging — a direction, not a settled design.** Surfaced in an external design conversation; recorded here so it can steer V2 framing without yet committing to it.
+> **Status: adopted (D-021).** Both forms ship at launch.
 
 The organizing distinction for the product's forms is **bounded vs. infinite**:
 

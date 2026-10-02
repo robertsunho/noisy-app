@@ -2,7 +2,7 @@
 
 Forward-looking plan for Noisy. Claude Code marks items complete (`[x]`) as work lands, with a Changelog entry for each. Ordered by phase; phases are sequenced but not time-boxed.
 
-**Last updated:** 2026-09-25
+**Last updated:** 2026-10-02
 **Current phase:** Phase 3 — Product Reimagining (Phase 2 complete)
 **Open validation debt:** [hardware validation](#needs-hardware-validation) (the five original checks, now eight items grouped by device — see the section below) is a pre-beta gate, deferred pending devices per D-019; it does not block Phase 3 design.
 
@@ -98,19 +98,39 @@ Claims accepted into the canonical docs that have **not** been checked on a real
 
 Vision-first redesign of the product layer, driven by `PRODUCT_DESIGN.md`. Synthesizes: Robert's re-engagement observations, the external evaluation, and promoted Bucket-C rulings.
 
-Known raw material to work into this phase:
+Organized into six design threads (D-021), tracked on the thread board in `SESSION_HANDOFF.md`.
+
+### Thread 1 — Experience & rooms
+*Scope: one listener's path through Radio, LP and Collection — first launch, the input moment, the output moment, navigation.*
 - [ ] Landing screen: static/cluttered → reimagine around synchronous externalization
 - [ ] Mood input model: sliders feel "technical middle-ground" → rethink the input moment
-- [ ] Navigation: 3–4 modes is right; reorganize/re-present
-- [ ] Determinism → ephemerality: mood engine is pure argmax; same sliders = identical mix. Weighted top-k draw (temperature via Remote Config) to deliver "never the same twice" (external eval §2 #3). *Directly serves the ephemerality thesis.*
-- [ ] Positioning: de-emphasize solfeggio/binaural mysticism; lead with "musical, not medical" / "humanly crafted, harmonically coherent" (external eval §3, §4)
-- [ ] "Glue" for the mix: candidate new engine capability (shared reverb / bus processing / master limiting) to make layers cohere (Robert's re-engagement note)
-- [ ] MotifEngine density redesign: prime-number system yields clumpy/sparse distribution, not steady organic density with a frequency hierarchy (Robert's re-engagement note)
+- [ ] Navigation: 3–4 modes is right; reorganize/re-present. *Direction set by D-021: three rooms (Radio, LP, Collection); Studio hidden.*
+- [ ] Positioning: de-emphasize solfeggio/binaural mysticism; lead with "musical, not medical" / "humanly crafted, harmonically coherent" (external eval §3, §4). *Direction set by D-021: music-first; functional keywords in store metadata only.*
 
+### Thread 2 — Sound & form
+*Scope: what a side of an LP and an hour of a station sound like; tests the Score model (D-021). Decided by ear.*
+- [ ] Determinism → ephemerality: mood engine is pure argmax; same sliders = identical mix. Weighted top-k draw (temperature via Remote Config) to deliver "never the same twice" (external eval §2 #3). *Directly serves the ephemerality thesis.*
+- [ ] MotifEngine density redesign: prime-number system yields clumpy/sparse distribution, not steady organic density with a frequency hierarchy (Robert's re-engagement note)
+- [ ] "Glue" for the mix: candidate new engine capability (shared reverb / bus processing / master limiting) to make layers cohere (Robert's re-engagement note)
+
+### Thread 3 — Visual identity
+*Scope: the visual tradition Noisy belongs to — artwork, type, motion, liner notes.*
+- *No items yet.*
+
+### Thread 4 — Content production
+*Scope: role taxonomy, launch counts and mastering of the sound library (`CONTENT_PRODUCTION.md`).*
+- [ ] Normalize the 29 existing files to −14 LUFS / −1.0 dBTP from the original masters, not by re-encoding the MP3s. Can start now; independent of V2 decisions. The 144-soundscape target stays provisional until thread 2's role taxonomy and the SoLoud evaluation.
+
+### Thread 5 — Architecture & engineering
+*Scope: what the engine must become to play scores — clock-driven performance, offline rendering, catalog unification.*
 - [ ] **LP timeline on a clock-based reference** — design the shaped/timed experience so its timeline is driven by **wall-clock / audio-position elapsed time, reconciled on resume**, rather than by accumulated Dart `Timer` ticks (which the OS throttles in background). Per **D-014** this belongs *inside* the LP design rather than as a retrofit — a shaped experience should be authored against a clock reference from the start. Scope is narrower than it sounds: `JourneyEngine` already samples a `Stopwatch`, so position cannot drift; what needs solving is resume behavior (glide rather than snap), layer add/remove events skipped inside a stall, and `AudioEngine`'s tick-accumulated crossfade blend. *(Touches empirically-tuned crossfade timing → needs a recorded decision before the code changes; see `TECHNICAL_ARCHITECTURE.md` §6.)*
 
 Promoted from Phase 2 Bucket C (see D-013):
-- [ ] **Unify the Mixer onto `sound_meta.dart`** (retire the separate ~25-entry Mixer catalog); **make soundscapes reachable in the Mixer**; **serve binaural/frequency via real-time synthesis, not MP3** *(ref R-17 / #17)*. Sits in Phase 3 because the Mixer's shape is decided by the navigation/IA reorganization above — design that first, then build the unified surface against it. **Separable sub-issue:** the MP3→synthesis half needs neither the catalog merge nor the Mixer rebuild and can be pulled forward on its own if manual testing shows the sampled binaural/frequency layers are audibly worse (they cannot be pitched to the mix's key).
+- [ ] **Unify the Mixer onto `sound_meta.dart`** (retire the separate ~25-entry Mixer catalog); **make soundscapes reachable in the Mixer**; **serve binaural/frequency via real-time synthesis, not MP3** *(ref R-17 / #17)*. Sits in Phase 3 because the Mixer's shape is decided by the navigation/IA reorganization in thread 1 — design that first, then build the unified surface against it. **Separable sub-issue:** the MP3→synthesis half needs neither the catalog merge nor the Mixer rebuild and can be pulled forward on its own if manual testing shows the sampled binaural/frequency layers are audibly worse (they cannot be pitched to the mix's key).
+
+### Thread 6 — Business & launch
+*Scope: entitlement model, pricing, store presence and launch sequencing (Foundation §5–6). Launch-readiness execution lives in Phase 5.*
+- *No items yet.*
 
 ---
 
@@ -124,22 +144,34 @@ Promoted from Phase 2 Bucket C (see D-013):
 Launch-blocker candidates from external evaluation (to be scheduled here or earlier as ruled):
 - [ ] **Background/lock-screen audio — platform configuration for continuous playback** *(additive; no engine-logic changes)*. Android foreground service (`FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_MEDIA_PLAYBACK`, `mediaPlayback` service, notification); iOS `UIBackgroundModes: audio` + activated `AVAudioSession` playback category; wire `audio_session` (**already in the dependency tree** transitively via `just_audio` — present but never imported or configured) or adopt `audio_service`. Per **D-014** this is sufficient for continuous/Radio-style playback on its own: the native audio layer sustains sound without Dart timers. Also add a lifecycle observer — the app currently has none. *(external eval §2 #1; D-004 scoped by D-014.)*
 - [ ] SoLoud migration for true pitch-shift-without-tempo-change; may shrink the 144-soundscape target (external eval §2 #2)
-- [ ] Move Anthropic API call server-side (Cloud Function); stop bundling `.env` in the app (external eval §3) — *deferred to V2 per D-015; remains a hard launch blocker.*
 - [x] Stop sending raw user mood-text to Firebase Analytics (external eval §3) — *done 2026-09-25 (C-016, D-017): replaced by length, word count and vocabulary theme tags; mix-name save event now logs length only.*
-- [ ] Replace `com.example.*` placeholder app IDs; real release signing (external eval §3)
 - [x] Saved mixes are lossy (don't round-trip pitch/tone/binaural params) (external eval §2 #4) — *done 2026-09-25 (C-017, D-018): v2 snapshot format with per-layer kind and parameters; pre-v2 saves still load; per-layer safe replay. Motifs remain unsaved (known gap).*
 - [x] Unit tests for `HarmonicMatcher` (the crown jewel, currently one smoke test) (external eval §2 #5) — *done 2026-09-25 (C-014): table-driven suite in `test/harmonic_matcher_test.dart`, 89 tests, expectations derived from equal-temperament theory.*
 
 ---
 
-## Phase 5+ — Content, Beta, Launch
+## Phase 5 — Launch Readiness
+
+The non-design work that must land before the app can be distributed or sold. (Launch blockers moved here from Phase 4 per D-021.)
+
+- [ ] Move Anthropic API call server-side (Cloud Function); stop bundling `.env` in the app (external eval §3) — *deferred to V2 per D-015; remains a hard launch blocker.*
+- [ ] Replace `com.example.*` placeholder app IDs; real release signing (external eval §3) — *a deliberate, recorded change; Firebase apps must be re-registered (`ENGINEERING_PRINCIPLES.md` rule 5).*
+- [ ] iOS build route — Mac with Xcode, or a cloud build service (e.g. Codemagic) + TestFlight. Same item as **Set up an iOS build route** under [Needs hardware validation](#needs-hardware-validation); tick both together.
+- [ ] Privacy policy
+  - [ ] Discloses that mood descriptions are sent to an AI service for interpretation.
+  - [ ] Discloses opt-in description sharing for testers (D-017).
+- [ ] Store-review risk review for solfeggio/binaural claims — check UI copy and store metadata against Apple/Google health-claim rules.
+- [ ] Entitlements and IAP plumbing — subscription and LP-pressing purchases (D-021), per the entitlement model designed in thread 6.
+
+---
+
+## Phase 6+ — Content, Beta, Launch
 
 - [ ] Content production pass (see `CONTENT_PRODUCTION.md`) — re-derive scope after SoLoud migration
 - [ ] Beta testing (real Android + iOS hardware)
-  - [ ] Opt-in description sharing for testers: consent prompt; separate store without device ID; retention limit; privacy-policy disclosure (D-017).
+  - [ ] Opt-in description sharing for testers: consent prompt; separate store without device ID; retention limit; privacy-policy disclosure (D-017; disclosure tracked under Phase 5 privacy policy).
   - [ ] *Candidate:* Satisfaction signals: regenerate-immediately, early abandon, listen duration, save.
 - [ ] Monetization + store prep
-  - [ ] Privacy policy discloses that mood descriptions are sent to an AI service for interpretation.
 - [ ] Marketing + launch
 
 ---

@@ -195,7 +195,7 @@ Small stateless service: strict JSON-only system prompt, 100-token cap, 10s time
 
 Five Firebase Analytics event wrappers, injected into `HomeScreen` and `MixerScreen`.
 
-**Rule (D-017, `ENGINEERING_PRINCIPLES.md` rule 9): no user-written text reaches analytics.** `logLlmGenerate` sends `text_length`, `word_count`, the resulting `energy`/`focus`/`warmth`, and `themes` (vocabulary tags comma-joined, `'none'` if empty — Firebase parameters can't be arrays; ≤ 3 tags stays under the 100-char limit). `logMixSave` sends `name_length`, not the typed mix name. The remaining events carry only app-defined values (catalog sound names, categories, slider numbers). Full-text collection is permitted only through an explicit opt-in to a separate, disclosed store — a beta requirement, not yet built (`ROADMAP.md` Phase 5).
+**Rule (D-017, `ENGINEERING_PRINCIPLES.md` rule 9): no user-written text reaches analytics.** `logLlmGenerate` sends `text_length`, `word_count`, the resulting `energy`/`focus`/`warmth`, and `themes` (vocabulary tags comma-joined, `'none'` if empty — Firebase parameters can't be arrays; ≤ 3 tags stays under the 100-char limit). `logMixSave` sends `name_length`, not the typed mix name. The remaining events carry only app-defined values (catalog sound names, categories, slider numbers). Full-text collection is permitted only through an explicit opt-in to a separate, disclosed store — a beta requirement, not yet built (`ROADMAP.md` Phase 6).
 
 ---
 

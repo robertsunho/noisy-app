@@ -2,8 +2,8 @@
 
 The living "where we left off" note between design conversations. **Not canon** — the canonical docs are the source of truth; this points into them. Rewritten (not appended) at the end of each design conversation. A new conversation reads DOCMAP, then this file.
 
-**Last updated:** 2026-09-25
-**Closes:** pre-V2 hardening conversation · **Opens:** V2 design (Phase 3)
+**Last updated:** 2026-10-02
+**Closes:** V2 direction conversation (D-021) · **Opens:** V2 design threads (Phase 3) — see the thread board
 
 ---
 
@@ -33,21 +33,18 @@ The living "where we left off" note between design conversations. **Not canon** 
   - faithful saved mixes (D-018)
 - The engine is preserved. The product layer is unchanged since July, so V2 starts from the shipped UX in `PRODUCT_DESIGN.md` §5.
 
-## What the V2 conversation is for
+## Thread board
 
-Phase 3 is **design, not build**. The open questions, in a suggested order (a suggestion, not a prescription):
+| # | Thread | Status | Current question | Next action | Blocked by |
+|---|---|---|---|---|---|
+| 1 | Experience & rooms | Open | One listener's path from first launch to first pressing | Robert reacts to the draft listener story | — |
+| 2 | Sound & form | Open | What a side of an LP and an hour of a station sound like; test the Score model | Written sketch, then a hidden Listening Lab screen | Loosely on 1 |
+| 3 | Visual identity | Not started | What visual tradition Noisy belongs to | Robert assembles a reference board | — |
+| 4 | Content production | Normalization can start | Role taxonomy and launch counts | Measure current loudness of the 29 files; locate masters | 2 (taxonomy, counts) |
+| 5 | Architecture & engineering | Investigations only | Can a score be rendered to audio offline on-device? SoLoud pitch-shift quality? | Scope the render investigation | 1–2 for design |
+| 6 | Business & launch | Direction set (Foundation §5) | Entitlement model | Sketch after thread 1's story | 1 |
 
-1. **Commit to the LP / Radio axis or not** (`PRODUCT_DESIGN.md` §3.7). Most downstream questions hang on it:
-   - the category taxonomy (§3.8, D-010)
-   - the fate of the curated journeys (R-29)
-   - the sleep timer
-   - whether a saved mix is a snapshot or a recipe (D-018)
-   - where the clock-based timeline work lives (D-014 Track B)
-   - what shape of LLM input the server-side contract serves (D-015)
-2. **The input moment** (§3.1) and **the output moment** (§3.2).
-3. **Navigation / IA** (§3.4). The Mixer unification (R-17) follows from it.
-4. **Ephemerality**: a weighted top-k draw instead of argmax (§3.3). This interacts with saved mixes: once generation stops being deterministic, a recipe no longer reproduces what the user heard.
-5. **Sonic glue** (§3.5) and the **MotifEngine density redesign**. Both are engine-capability candidates and are listening work.
+Every design conversation starts by reading this board and ends by updating it. Cross-thread decisions happen in the hub conversation; deep dives may be separate chats that end with a board update.
 
 ## Decisions V2 inherits (don't relitigate without new cause)
 
@@ -58,6 +55,7 @@ Phase 3 is **design, not build**. The open questions, in a suggested order (a su
 - **D-016:** V2 makes `SoundscapeSource.rootFrequency` nullable.
 - **D-017:** no user-written text in analytics. The theme vocabulary can seed Radio station naming.
 - **D-018:** saved mixes are snapshots for now. The `version` field lets V2 migrate them either way.
+- **D-021:** V2 direction adopted from `design-inputs/noisy_v2_foundation.md` — music-first; three rooms (Radio, LP, Collection), LP and Radio both at launch; Studio hidden; subscription for the service, purchases for owned pressings. The Score model is a working hypothesis, not yet a decision.
 
 ## Known gaps carried into V2
 
